@@ -1,8 +1,9 @@
 {
     "name": "scripts",
     "version": "0.0.0",
+    "type": "module",
     "scripts": {
-      "migrate": "node migrate.ts",
+      "migrate": "ts-node-esm migrate.ts",
       "typecheck": "tsc -noEmit"
     },
     "dependencies": {

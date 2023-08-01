@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+      "esModuleInterop": true,
+      "moduleResolution": "nodenext",
+      "allowImportingTsExtensions": true,
+      "module": "es6",
+      "target": "es5",   
+    }
+}
