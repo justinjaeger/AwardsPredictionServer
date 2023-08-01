@@ -1,0 +1,13 @@
+{
+    "name": "scripts",
+    "version": "0.0.0",
+    "scripts": {
+      "migrate": "node migrate.ts",
+      "typecheck": "tsc -noEmit"
+    },
+    "dependencies": {
+      "@aws-sdk/client-dynamodb": "^3.379.1",
+      "mongodb": "^5.7.0"
+    }
+  }
+  
