@@ -1,5 +1,7 @@
 {
   "search.exclude": {
     "**/.sst": true
-  }
+  },
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true
 }

@@ -1,11 +1,14 @@
 {
   "extends": "@tsconfig/node16/tsconfig.json",
+  "include": ["src/**/*"],
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@rest-api-mongodb/core/*": ["../core/src/*"]
-    }
+        "@rest-api-mongodb/core/*": ["../core/src/*"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   }
 }
