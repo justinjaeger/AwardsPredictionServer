@@ -10,7 +10,8 @@
     "remove": "sst remove",
     "console": "sst console",
     "typecheck": "tsc --noEmit",
-    "script": "node ./scripts/migrate.ts"
+    "script": "node ./scripts/migrate.ts",
+    "lint": "eslint . --ext .ts"
   },
   "devDependencies": {
     "sst": "^2.22.3",
