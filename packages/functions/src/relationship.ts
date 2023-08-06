@@ -13,7 +13,7 @@ export const post = dbWrapper(async ({ db }) => {
   };
 });
 
-export const destroy = dbWrapper(async ({ db }) => {
+export const remove = dbWrapper(async ({ db }) => {
   return {
     statusCode: 200
   };

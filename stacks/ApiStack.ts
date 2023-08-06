@@ -40,6 +40,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /tokens": `${PATH}/token.list`, // not userId bc that will be passed in the header
       "GET /predictionset/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
+      "GET /jwt": `${PATH}/jwt.get`,
       // POST
       "POST /user": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationship/{followedUserId}": `${PATH}/relationship.post`,
@@ -58,7 +59,9 @@ export function ApiStack({ stack }: StackContext) {
       "PUT /person/{id}": `${PATH}/person.put`, // ADMIN ONLY
       "PUT /song/{id}": `${PATH}/song.put`, // ADMIN ONLY
       // DELETE
-      "DELETE /relationship/{followedUserId}": `${PATH}/relationship.destroy`,
+      "DELETE /relationship": `${PATH}/relationship.remove`,
+      "DELETE /token": `${PATH}/token.remove`,
+      "DELETE /tokens": `${PATH}/token.removeAllUserTokens`,
     },
   });
 

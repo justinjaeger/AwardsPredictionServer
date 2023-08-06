@@ -77,3 +77,29 @@ export const post = dbWrapper<{}, string>(
     };
   }
 );
+
+/**
+ * Deletes a refresh token
+ */
+export const remove = dbWrapper<{ token: string }, string>(
+  async ({ db, payload }) => {
+    const { token } = payload;
+    const tokens = db.collection<Token>('tokens');
+    await tokens.deleteOne({ token });
+
+    return { statusCode: 200 };
+  }
+);
+
+/**
+ * Deletes all tokens associated with a user
+ */
+export const removeAllUserTokens = dbWrapper<{ userId: string }, string>(
+  async ({ db, payload }) => {
+    const { userId } = payload;
+    const tokens = db.collection<Token>('tokens');
+    await tokens.deleteMany({ userId: new ObjectId(userId) });
+
+    return { statusCode: 200 };
+  }
+);
