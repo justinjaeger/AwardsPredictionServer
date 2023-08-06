@@ -24,6 +24,7 @@ export function ApiStack({ stack }: StackContext) {
       function: {
         environment: {
           MONGODB_URI: MONGODB_URI,
+          JWT_SECRET: process.env.JWT_SECRET || '',
         },
       },
     },

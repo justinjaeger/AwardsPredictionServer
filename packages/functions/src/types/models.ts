@@ -130,7 +130,6 @@ export interface Song {
 }
 
 export interface Token {
-  _id: ObjectId;
   userId: ObjectId;
   token: string;
 }
