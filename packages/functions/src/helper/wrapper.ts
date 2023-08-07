@@ -17,7 +17,7 @@ export function dbWrapper<Req = {}, Res = {}>(
     event: APIGatewayProxyEvent;
     context: Context;
     db: Db;
-    authenticatedUserId: string | undefined; // returns if the user is authenticated
+    authenticatedUserId: string | undefined; // returns string if user is authenticated
     payload: Req;
   }) => Promise<ApiResponse<Res>>
 ) {

@@ -37,7 +37,6 @@ export function ApiStack({ stack }: StackContext) {
       "GET /users/follower/{userId}": `${PATH}/user.listFollowers`,
       "GET /relationship/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
       "GET /token/{token}": `${PATH}/token.get`, // not userId bc that will be passed in the header
-      "GET /tokens": `${PATH}/token.list`, // not userId bc that will be passed in the header
       "GET /predictionset/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
       "GET /jwt": `${PATH}/jwt.get`,
@@ -52,7 +51,7 @@ export function ApiStack({ stack }: StackContext) {
       "POST /song": `${PATH}/song.post`,
       "POST /event": `${PATH}/event.post`, // ADMIN ONLY
       // PUT
-      "PUT /user/{id}": `${PATH}/user.put`,
+      "PUT /user": `${PATH}/user.put`, // userId derived from token
       "PUT /event/{id}": `${PATH}/event.post`, // ADMIN ONLY
       "PUT /contender/{id}": `${PATH}/contender.put`, // ADMIN ONLY
       "PUT /movie/{id}": `${PATH}/movie.put`, // ADMIN ONLY

@@ -46,13 +46,6 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   };
 });
 
-// returns Token[]
-export const list = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200
-  };
-});
-
 /**
  * Creates a refresh token
  * Notably, this requires an access token, so that must be created first
