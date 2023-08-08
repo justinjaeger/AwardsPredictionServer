@@ -49,6 +49,7 @@ export function ApiStack({ stack }: StackContext) {
       "POST /movie": `${PATH}/movie.post`,
       "POST /person": `${PATH}/person.post`,
       "POST /song": `${PATH}/song.post`,
+      // PUT
       "PUT /user": `${PATH}/user.put`, // userId derived from token
       // DELETE
       "DELETE /relationship": `${PATH}/relationship.remove`,
