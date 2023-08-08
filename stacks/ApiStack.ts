@@ -49,14 +49,7 @@ export function ApiStack({ stack }: StackContext) {
       "POST /movie": `${PATH}/movie.post`,
       "POST /person": `${PATH}/person.post`,
       "POST /song": `${PATH}/song.post`,
-      "POST /event": `${PATH}/event.post`, // ADMIN ONLY
-      // PUT
       "PUT /user": `${PATH}/user.put`, // userId derived from token
-      "PUT /event/{id}": `${PATH}/event.post`, // ADMIN ONLY
-      "PUT /contender/{id}": `${PATH}/contender.put`, // ADMIN ONLY
-      "PUT /movie/{id}": `${PATH}/movie.put`, // ADMIN ONLY
-      "PUT /person/{id}": `${PATH}/person.put`, // ADMIN ONLY
-      "PUT /song/{id}": `${PATH}/song.put`, // ADMIN ONLY
       // DELETE
       "DELETE /relationship": `${PATH}/relationship.remove`,
       "DELETE /token": `${PATH}/token.remove`,
