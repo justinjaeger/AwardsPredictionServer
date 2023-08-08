@@ -19,6 +19,7 @@ export function dbWrapper<Req = {}, Res = {}>(
     db: Db;
     authenticatedUserId: string | undefined; // returns string if user is authenticated
     payload: Req;
+    params: Record<string, string | undefined>;
   }) => Promise<ApiResponse<Res>>
 ) {
   return async (event: APIGatewayProxyEvent, context: Context) => {
@@ -47,12 +48,17 @@ export function dbWrapper<Req = {}, Res = {}>(
         }
       }
     }
+    const params = {
+      ...event.pathParameters,
+      ...event.queryStringParameters
+    };
     return await func({
       event,
       context,
       db,
       authenticatedUserId,
-      payload
+      payload,
+      params
     });
   };
 }
