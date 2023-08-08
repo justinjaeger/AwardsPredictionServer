@@ -1,41 +1,46 @@
 import { dbWrapper } from './helper/wrapper';
+import { type User } from './types/models';
 
-// returns User
-export const get = dbWrapper(async ({ db }) => {
+export const get = dbWrapper<Partial<User>>(async ({ db }) => {
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: {}
   };
 });
 
-// returns User[]
-export const list = dbWrapper(async ({ db }) => {
+export const list = dbWrapper<Array<Partial<User>>>(async ({ db }) => {
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: []
   };
 });
 
-// returns User[]
-export const listFollowings = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200
-  };
-});
+export const listFollowings = dbWrapper<Array<Partial<User>>>(
+  async ({ db }) => {
+    return {
+      statusCode: 200,
+      data: []
+    };
+  }
+);
 
-// returns User[]
-export const listFollowers = dbWrapper(async ({ db }) => {
+export const listFollowers = dbWrapper<Array<Partial<User>>>(async ({ db }) => {
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: []
   };
 });
 
 export const post = dbWrapper(async ({ db }) => {
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: null
   };
 });
 
 export const put = dbWrapper(async ({ db }) => {
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: null
   };
 });

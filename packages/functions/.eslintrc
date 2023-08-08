@@ -24,6 +24,7 @@
         // "semi": ["error", "always"],
         "@typescript-eslint/strict-boolean-expressions": 0,
         "@typescript-eslint/consistent-type-definitions": 0,
-        "prettier/prettier": 2 // Means error
+        "prettier/prettier": 2,
+        "@typescript-eslint/ban-types": 0
     }
 }

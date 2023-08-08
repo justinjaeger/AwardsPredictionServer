@@ -9,7 +9,6 @@ import {
 } from './enums';
 
 export interface ActivePrediction {
-  _id: ObjectId;
   eventId: ObjectId;
   userId: ObjectId;
   contenderId: ObjectId;
@@ -19,7 +18,6 @@ export interface ActivePrediction {
 }
 
 export interface CategoryUpdateLog {
-  _id: ObjectId;
   userId: ObjectId;
   eventId: ObjectId;
   category: CategoryName;
@@ -27,7 +25,6 @@ export interface CategoryUpdateLog {
 }
 
 export interface Contender {
-  _id: ObjectId;
   eventId: ObjectId;
   movieId: ObjectId;
   visible: boolean;
@@ -39,7 +36,6 @@ export interface Contender {
 }
 
 export interface EventModel {
-  _id: ObjectId;
   categories: Record<
     CategoryName,
     {
@@ -57,7 +53,6 @@ export interface EventModel {
 }
 
 export interface Movie {
-  _id: ObjectId;
   tmdbId: number;
   title: string;
   studio?: string;
@@ -77,7 +72,6 @@ export interface Movie {
 }
 
 export interface Person {
-  _id: ObjectId;
   tmdbId: number;
   imdbId?: string;
   name?: string;
@@ -85,7 +79,6 @@ export interface Person {
 }
 
 export interface PredictionSet {
-  _id: ObjectId;
   userId: ObjectId;
   eventId: ObjectId;
   yyyymmdd: number;
@@ -117,26 +110,22 @@ export interface PredictionSet {
 }
 
 export interface Relationship {
-  _id: ObjectId;
   followedUserId: ObjectId;
   followingUserId: ObjectId;
 }
 
 export interface Song {
-  _id: ObjectId;
   movieId: ObjectId;
   title: string;
   artist?: string;
 }
 
 export interface Token {
-  _id: ObjectId;
   userId: ObjectId;
   token: string;
 }
 
 export interface User {
-  _id: ObjectId;
   email: string;
   username?: string;
   name?: string;

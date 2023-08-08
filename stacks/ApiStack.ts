@@ -24,6 +24,7 @@ export function ApiStack({ stack }: StackContext) {
       function: {
         environment: {
           MONGODB_URI: MONGODB_URI,
+          JWT_SECRET: process.env.JWT_SECRET || '',
         },
       },
     },
@@ -36,9 +37,9 @@ export function ApiStack({ stack }: StackContext) {
       "GET /users/follower/{userId}": `${PATH}/user.listFollowers`,
       "GET /relationship/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
       "GET /token/{token}": `${PATH}/token.get`, // not userId bc that will be passed in the header
-      "GET /tokens": `${PATH}/token.list`, // not userId bc that will be passed in the header
       "GET /predictionset/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
+      "GET /jwt": `${PATH}/jwt.get`,
       // POST
       "POST /user": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationship/{followedUserId}": `${PATH}/relationship.post`,
@@ -50,14 +51,16 @@ export function ApiStack({ stack }: StackContext) {
       "POST /song": `${PATH}/song.post`,
       "POST /event": `${PATH}/event.post`, // ADMIN ONLY
       // PUT
-      "PUT /user/{id}": `${PATH}/user.put`,
+      "PUT /user": `${PATH}/user.put`, // userId derived from token
       "PUT /event/{id}": `${PATH}/event.post`, // ADMIN ONLY
       "PUT /contender/{id}": `${PATH}/contender.put`, // ADMIN ONLY
       "PUT /movie/{id}": `${PATH}/movie.put`, // ADMIN ONLY
       "PUT /person/{id}": `${PATH}/person.put`, // ADMIN ONLY
       "PUT /song/{id}": `${PATH}/song.put`, // ADMIN ONLY
       // DELETE
-      "DELETE /relationship/{followedUserId}": `${PATH}/relationship.destroy`,
+      "DELETE /relationship": `${PATH}/relationship.remove`,
+      "DELETE /token": `${PATH}/token.remove`,
+      "DELETE /tokens": `${PATH}/token.removeAllUserTokens`,
     },
   });
 
