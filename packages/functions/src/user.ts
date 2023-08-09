@@ -1,7 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type User } from './types/models';
-import { parseOneFromCursor } from './helper/parseCursor';
 
 export const get = dbWrapper<{}, Partial<User>>(async ({ db, params }) => {
   const { id, excludeNestedFields } = params;
@@ -12,8 +11,7 @@ export const get = dbWrapper<{}, Partial<User>>(async ({ db, params }) => {
     ? { eventsPredicting: 0, recentPredictionSets: 0 }
     : {};
   const users = db.collection<User>('users');
-  const userRes = users.find({ _id: new ObjectId(id) }).project(projection);
-  const user = await parseOneFromCursor<User>(userRes);
+  const user = await users.findOne({ _id: new ObjectId(id) }, { projection });
   if (!user) {
     return {
       statusCode: 400,
