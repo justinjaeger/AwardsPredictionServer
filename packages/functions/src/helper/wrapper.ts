@@ -19,7 +19,7 @@ export function dbWrapper<Req = {}, Res = {}>(
     db: Db;
     authenticatedUserId: string | undefined; // returns string if user is authenticated
     payload: Req;
-    params: Record<string, string | undefined>;
+    params: Record<string, any | undefined>;
   }) => Promise<ApiResponse<Res>>
 ) {
   return async (event: APIGatewayProxyEvent, context: Context) => {
@@ -39,8 +39,8 @@ export function dbWrapper<Req = {}, Res = {}>(
         if (!jwtPayload?.isRefreshToken) {
           authenticatedUserId = jwtPayload?.userId;
         }
-      } catch (err) {
-        if (err.name === 'TokenExpiredError') {
+      } catch (err: any) {
+        if (err?.name === 'TokenExpiredError') {
           return {
             statusCode: 401,
             error: 'TokenExpiredError'

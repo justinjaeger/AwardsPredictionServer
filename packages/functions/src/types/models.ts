@@ -114,6 +114,11 @@ export interface Relationship {
   followingUserId: ObjectId;
 }
 
+export interface RelationshipWithUser extends Relationship {
+  followedUserList: User[];
+  followingUserList: User[];
+}
+
 export interface Song {
   movieId: ObjectId;
   title: string;
