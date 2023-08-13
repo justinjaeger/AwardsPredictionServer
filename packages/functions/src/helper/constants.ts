@@ -1,0 +1,1 @@
+export const DEFAULT_PAGINATE_LIMIT = 10;

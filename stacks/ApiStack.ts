@@ -32,7 +32,7 @@ export function ApiStack({ stack }: StackContext) {
       // GET
       "GET /": `${PATH}/test.get`, // for testing
       "GET /user/{id}": `${PATH}/user.get`,
-      "GET /users/list": `${PATH}/user.list`,
+      "GET /users/search": `${PATH}/user.search`,
       "GET /users/following/{userId}": `${PATH}/user.listFollowings`,
       "GET /users/follower/{userId}": `${PATH}/user.listFollowers`,
       "GET /relationship/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
