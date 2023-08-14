@@ -1,55 +1,70 @@
-import { type Document, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type RelationshipWithUser,
   type Relationship,
   type User
 } from './types/models';
-import { paginateCursor, paginateAggregate } from './helper/utils';
+import { paginateCursor, getAggregatePagination } from './helper/utils';
 
-export const get = dbWrapper<{}, Partial<User>>(async ({ db, params }) => {
-  const { id, email, oauthId, excludeNestedFields } = params;
-  const projection = excludeNestedFields
-    ? { eventsPredicting: 0, recentPredictionSets: 0 }
-    : {};
-  const filter = id
-    ? { _id: new ObjectId(id) }
-    : email
-    ? { email }
-    : oauthId
-    ? { oauthId }
-    : {};
-  if (Object.keys(filter).length === 0) {
-    return { statusCode: 400, error: 'BadRequest' };
-  }
-  const users = db.collection<User>('users');
-  const user = await users.findOne(filter, { projection });
-  if (!user) {
+/**
+ * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
+ *
+ * To use "explain()" on aggregate, remove ?retryWrites=true&w=majority from MONGODB_URI
+ * .explain('executionStats'); (to get info on indexes)
+ *
+ * If experimenting with index speed, can use this to toggle indexes on and off:
+ * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
+ */
+
+export const get = dbWrapper<{}, Partial<User>>(
+  async ({ db, params: { id, email, oauthId, excludeNestedFields } }) => {
+    const projection = excludeNestedFields
+      ? { eventsPredicting: 0, recentPredictionSets: 0 }
+      : {};
+    const filter = id
+      ? { _id: new ObjectId(id) }
+      : email
+      ? { email }
+      : oauthId
+      ? { oauthId }
+      : {};
+
+    if (Object.keys(filter).length === 0) {
+      return { statusCode: 400, error: 'BadRequest' };
+    }
+
+    const user = await db
+      .collection<User>('users')
+      .findOne(filter, { projection });
+    if (!user) {
+      return {
+        statusCode: 400,
+        error: 'NotFound',
+        message: 'User not found'
+      };
+    }
+
     return {
-      statusCode: 400,
-      error: 'NotFound',
-      message: 'User not found'
+      statusCode: 200,
+      data: user
     };
   }
-  return {
-    statusCode: 200,
-    data: user
-  };
-});
+);
 
 // TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
 export const search = dbWrapper<{}, Array<Partial<User>>>(
-  async ({ db, params }) => {
-    const { query, limit, pageNumber } = params;
+  async ({ db, params: { query, limit, pageNumber } }) => {
     if (!query) {
       return { statusCode: 400, error: 'BadRequest' };
     }
-    // https://www.mongodb.com/docs/manual/core/link-text-indexes/
+
     const searchCursor = db.collection<User>('users').find({
       $text: { $search: 'bro' }
     });
     paginateCursor(searchCursor, pageNumber, limit);
     const userList = await searchCursor.toArray();
+
     return {
       statusCode: 200,
       data: userList
@@ -57,45 +72,48 @@ export const search = dbWrapper<{}, Array<Partial<User>>>(
   }
 );
 
+/**
+ * If I want the recent predictions from who user is following,
+ * I can include includeRecentPredictionSets.
+ * Otherwise, I'll just basic information on who user is following.
+ */
 export const listFollowings = dbWrapper<{}, Array<Partial<User>>>(
-  async ({ db, params }) => {
-    const { userId, limit, pageNumber, includeRecentPredictionSets } = params;
+  async ({
+    db,
+    params: { userId, limit, pageNumber, includeRecentPredictionSets }
+  }) => {
     if (!userId) {
       return { statusCode: 400, error: 'BadRequest' };
     }
-    const relationships = db.collection<Relationship>('relationships');
-    const aggregate: Document[] = [
-      {
-        $match: {
-          followingUserId: new ObjectId(userId)
+
+    const followedUsers = await db
+      .collection<Relationship>('relationships')
+      .aggregate<RelationshipWithUser>([
+        {
+          $match: {
+            followingUserId: new ObjectId(userId)
+          }
+        },
+        {
+          $project: { _id: 0, followedUserId: 1 }
+        },
+        ...getAggregatePagination(pageNumber, limit),
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followedUserId',
+            foreignField: '_id',
+            as: 'followedUserList',
+            pipeline: [
+              {
+                $project: includeRecentPredictionSets
+                  ? { eventsPredicting: 0 }
+                  : { username: 1, name: 1, image: 1 }
+              }
+            ]
+          }
         }
-      }
-    ];
-    paginateAggregate(aggregate, pageNumber, limit);
-    aggregate.push({
-      $project: { _id: 0, followedUserId: 1 }
-    });
-    aggregate.push({
-      $lookup: {
-        from: 'users',
-        localField: 'followedUserId',
-        foreignField: '_id',
-        as: 'followedUserList',
-        pipeline: includeRecentPredictionSets
-          ? [
-              {
-                $project: { eventsPredicting: 0 }
-              }
-            ]
-          : [
-              {
-                $project: { eventsPredicting: 0, recentPredictionSets: 0 }
-              }
-            ]
-      }
-    });
-    const followedUsers = await relationships
-      .aggregate<RelationshipWithUser>(aggregate)
+      ])
       .map(({ followedUserList }) => followedUserList[0])
       .toArray();
 
@@ -107,10 +125,43 @@ export const listFollowings = dbWrapper<{}, Array<Partial<User>>>(
 );
 
 export const listFollowers = dbWrapper<{}, Array<Partial<User>>>(
-  async ({ db }) => {
+  async ({ db, params: { userId, limit, pageNumber } }) => {
+    if (!userId) {
+      return { statusCode: 400, error: 'BadRequest' };
+    }
+
+    const followedUsers = await db
+      .collection<Relationship>('relationships')
+      .aggregate<RelationshipWithUser>([
+        {
+          $match: {
+            followedUserId: new ObjectId(userId)
+          }
+        },
+        ...getAggregatePagination(pageNumber, limit),
+        {
+          $project: { _id: 0, followingUserId: 1 }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followingUserId',
+            foreignField: '_id',
+            as: 'followingUserList',
+            pipeline: [
+              {
+                $project: { username: 1, name: 1, image: 1 }
+              }
+            ]
+          }
+        }
+      ])
+      .map(({ followingUserList }) => followingUserList[0])
+      .toArray();
+
     return {
       statusCode: 200,
-      data: []
+      data: followedUsers
     };
   }
 );

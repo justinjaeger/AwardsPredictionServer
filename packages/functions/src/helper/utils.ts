@@ -10,11 +10,7 @@ export const paginateCursor = (
   cursor.limit(limit);
 };
 
-export const paginateAggregate = (
-  aggregate: Document[],
+export const getAggregatePagination = (
   pageNumber: number = 1,
   limit: number = DEFAULT_PAGINATE_LIMIT
-) => {
-  aggregate.push({ $skip: (pageNumber - 1) * limit });
-  aggregate.push({ $limit: limit });
-};
+): Document[] => [{ $skip: (pageNumber - 1) * limit }, { $limit: limit }];
