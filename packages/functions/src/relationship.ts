@@ -7,11 +7,17 @@ export const get = dbWrapper(async ({ db }) => {
   };
 });
 
-export const post = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200
-  };
-});
+export const post = dbWrapper<{ followedUserId: string }>(
+  async ({
+    db,
+    payload: { followedUserId },
+    authenticatedUserId: followingUserId
+  }) => {
+    return {
+      statusCode: 200
+    };
+  }
+);
 
 export const remove = dbWrapper(async ({ db }) => {
   return {

@@ -16,7 +16,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
     return {
       statusCode: 400,
       error: 'BadRequest',
-      message: 'Requires token'
+      message: 'Requires refresh token'
     };
   }
 
@@ -78,13 +78,8 @@ export const post = dbWrapper<{}, string>(
  * Deletes all user tokens if userId is passed
  */
 export const remove = dbWrapper<{ token: string }, string>(
-  async ({
-    db,
-    payload: { token },
-    params: { userId },
-    authenticatedUserId
-  }) => {
-    if (!authenticatedUserId) {
+  async ({ db, payload: { token }, authenticatedUserId: userId }) => {
+    if (!userId) {
       return { statusCode: 401, error: 'Unauthenticated' };
     }
 
