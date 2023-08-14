@@ -18,12 +18,13 @@ import { paginateCursor, getAggregatePagination } from './helper/utils';
  */
 
 export const get = dbWrapper<{}, Partial<User>>(
-  async ({ db, params: { id, email, oauthId, excludeNestedFields } }) => {
+  async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
     const projection = excludeNestedFields
       ? { eventsPredicting: 0, recentPredictionSets: 0 }
       : {};
-    const filter = id
-      ? { _id: new ObjectId(id) }
+
+    const filter = userId
+      ? { _id: new ObjectId(userId) }
       : email
       ? { email }
       : oauthId
@@ -37,6 +38,7 @@ export const get = dbWrapper<{}, Partial<User>>(
     const user = await db
       .collection<User>('users')
       .findOne(filter, { projection });
+
     if (!user) {
       return {
         statusCode: 400,
@@ -44,7 +46,6 @@ export const get = dbWrapper<{}, Partial<User>>(
         message: 'User not found'
       };
     }
-
     return {
       statusCode: 200,
       data: user
@@ -172,7 +173,10 @@ export const post = dbWrapper<{}, {}>(async ({ db }) => {
   };
 });
 
-export const put = dbWrapper<{}, {}>(async ({ db }) => {
+export const put = dbWrapper<{}, {}>(async ({ db, authenticatedUserId }) => {
+  if (!authenticatedUserId) {
+    return { statusCode: 401, error: 'Unauthenticated' };
+  }
   return {
     statusCode: 200
   };
