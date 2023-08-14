@@ -3,7 +3,7 @@ import { DEFAULT_PAGINATE_LIMIT } from './constants';
 
 export const paginateCursor = (
   cursor: FindCursor<any>,
-  pageNumber: number = 0,
+  pageNumber: number = 1,
   limit: number = DEFAULT_PAGINATE_LIMIT
 ) => {
   cursor.skip((pageNumber - 1) * limit);
@@ -12,7 +12,7 @@ export const paginateCursor = (
 
 export const paginateAggregate = (
   aggregate: Document[],
-  pageNumber: number = 0,
+  pageNumber: number = 1,
   limit: number = DEFAULT_PAGINATE_LIMIT
 ) => {
   aggregate.push({ $skip: (pageNumber - 1) * limit });
