@@ -10,6 +10,7 @@ import Jwt from './helper/jwt';
  */
 export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   // the wrapper isn't going to let the refresh token pass, so handle it here
+
   const refreshToken = event?.headers?.Authorization?.split(' ')[1];
   if (!refreshToken) {
     return {
@@ -18,6 +19,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
       message: 'Requires token'
     };
   }
+
   const jwtPayload = Jwt.validateToken(refreshToken);
   const { userId, isRefreshToken } = jwtPayload ?? {};
   if (!isRefreshToken || !userId) {
@@ -27,8 +29,8 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
       message: 'Invalid token'
     };
   }
-  const tokens = db.collection<Token>('tokens');
-  const dbToken = await tokens.findOne({
+
+  const dbToken = await db.collection<Token>('tokens').findOne({
     token: refreshToken,
     userId: new ObjectId(userId)
   });
@@ -39,10 +41,10 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
       message: 'No matching token in db - log the user out'
     };
   }
-  const newAccessToken = Jwt.createAccessToken(userId);
+
   return {
     statusCode: 200,
-    data: newAccessToken
+    data: Jwt.createAccessToken(userId)
   };
 });
 
@@ -72,26 +74,31 @@ export const post = dbWrapper<{}, string>(
 );
 
 /**
- * Deletes a refresh token
+ * Deletes a refresh token if token is passed
+ * Deletes all user tokens if userId is passed
  */
 export const remove = dbWrapper<{ token: string }, string>(
-  async ({ db, payload }) => {
-    const { token } = payload;
-    const tokens = db.collection<Token>('tokens');
-    await tokens.deleteOne({ token });
+  async ({
+    db,
+    payload: { token },
+    params: { userId },
+    authenticatedUserId
+  }) => {
+    if (!authenticatedUserId) {
+      return { statusCode: 401, error: 'Unauthenticated' };
+    }
 
-    return { statusCode: 200 };
-  }
-);
-
-/**
- * Deletes all tokens associated with a user
- */
-export const removeAllUserTokens = dbWrapper<{ userId: string }, string>(
-  async ({ db, payload }) => {
-    const { userId } = payload;
     const tokens = db.collection<Token>('tokens');
-    await tokens.deleteMany({ userId: new ObjectId(userId) });
+
+    if (!token && !userId) {
+      return { statusCode: 400, error: 'BadRequest' };
+    }
+
+    if (token) {
+      await tokens.deleteOne({ token });
+    } else if (userId) {
+      await tokens.deleteMany({ userId: new ObjectId(userId) });
+    }
 
     return { statusCode: 200 };
   }
