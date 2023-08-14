@@ -17,5 +17,4 @@ export const paginateAggregate = (
 ) => {
   aggregate.push({ $skip: (pageNumber - 1) * limit });
   aggregate.push({ $limit: limit });
-  return aggregate;
 };
