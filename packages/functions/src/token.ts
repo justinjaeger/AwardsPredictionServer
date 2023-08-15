@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type Token } from './types/models';
 import Jwt from './helper/jwt';
+import { SERVER_ERROR } from './types/responses';
 
 /**
  * Pass refresh token in header
@@ -14,9 +15,8 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   const refreshToken = event?.headers?.Authorization?.split(' ')[1];
   if (!refreshToken) {
     return {
-      statusCode: 400,
-      error: 'BadRequest',
-      message: 'Requires refresh token'
+      ...SERVER_ERROR.BadRequest,
+      message: 'Requires token'
     };
   }
 
@@ -24,9 +24,8 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   const { userId, isRefreshToken } = jwtPayload ?? {};
   if (!isRefreshToken || !userId) {
     return {
-      statusCode: 401,
-      error: 'InvalidTokenError',
-      message: 'Invalid token'
+      ...SERVER_ERROR.InvalidTokenError,
+      message: 'Invalid refresh token'
     };
   }
 
@@ -35,11 +34,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
     userId: new ObjectId(userId)
   });
   if (!dbToken) {
-    return {
-      statusCode: 403,
-      error: 'Forbidden',
-      message: 'No matching token in db - log the user out'
-    };
+    return SERVER_ERROR.RevokeAccess;
   }
 
   return {
@@ -55,7 +50,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
 export const post = dbWrapper<{}, string>(
   async ({ db, authenticatedUserId }) => {
     if (!authenticatedUserId) {
-      return { statusCode: 401, error: 'Unauthenticated' };
+      return SERVER_ERROR.Unauthenticated;
     }
 
     const refreshToken = Jwt.createRefreshToken(authenticatedUserId);
@@ -80,13 +75,16 @@ export const post = dbWrapper<{}, string>(
 export const remove = dbWrapper<{ token: string }, string>(
   async ({ db, payload: { token }, authenticatedUserId: userId }) => {
     if (!userId) {
-      return { statusCode: 401, error: 'Unauthenticated' };
+      return SERVER_ERROR.Unauthenticated;
     }
 
     const tokens = db.collection<Token>('tokens');
 
     if (!token && !userId) {
-      return { statusCode: 400, error: 'BadRequest' };
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: 'Missing body properties'
+      };
     }
 
     if (token) {

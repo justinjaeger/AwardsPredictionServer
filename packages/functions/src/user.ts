@@ -6,6 +6,7 @@ import {
   type User
 } from './types/models';
 import { paginateCursor, getAggregatePagination } from './helper/utils';
+import { SERVER_ERROR } from './types/responses';
 
 /**
  * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
@@ -32,7 +33,7 @@ export const get = dbWrapper<{}, Partial<User>>(
       : {};
 
     if (Object.keys(filter).length === 0) {
-      return { statusCode: 400, error: 'BadRequest' };
+      return SERVER_ERROR.BadRequest;
     }
 
     const user = await db
@@ -41,8 +42,7 @@ export const get = dbWrapper<{}, Partial<User>>(
 
     if (!user) {
       return {
-        statusCode: 400,
-        error: 'NotFound',
+        ...SERVER_ERROR.NotFound,
         message: 'User not found'
       };
     }
@@ -57,7 +57,7 @@ export const get = dbWrapper<{}, Partial<User>>(
 export const search = dbWrapper<{}, Array<Partial<User>>>(
   async ({ db, params: { query, limit, pageNumber } }) => {
     if (!query) {
-      return { statusCode: 400, error: 'BadRequest' };
+      return SERVER_ERROR.BadRequest;
     }
 
     const searchCursor = db.collection<User>('users').find({
@@ -84,7 +84,7 @@ export const listFollowings = dbWrapper<{}, Array<Partial<User>>>(
     params: { userId, limit, pageNumber, includeRecentPredictionSets }
   }) => {
     if (!userId) {
-      return { statusCode: 400, error: 'BadRequest' };
+      return SERVER_ERROR.BadRequest;
     }
 
     const followedUsers = await db
@@ -128,7 +128,7 @@ export const listFollowings = dbWrapper<{}, Array<Partial<User>>>(
 export const listFollowers = dbWrapper<{}, Array<Partial<User>>>(
   async ({ db, params: { userId, limit, pageNumber } }) => {
     if (!userId) {
-      return { statusCode: 400, error: 'BadRequest' };
+      return SERVER_ERROR.BadRequest;
     }
 
     const followedUsers = await db
@@ -167,17 +167,52 @@ export const listFollowers = dbWrapper<{}, Array<Partial<User>>>(
   }
 );
 
-export const post = dbWrapper<{}, {}>(async ({ db }) => {
+export const post = dbWrapper<
+  { email: string; name?: string; username?: string },
+  string // returns the user id
+>(async ({ db, payload: { email, name, username } }) => {
+  const newUser: User = {
+    email
+  };
+  if (name) newUser.name = name;
+  if (username) newUser.username = username;
+  const user = await db.collection<User>('users').insertOne(newUser);
   return {
-    statusCode: 200
+    statusCode: 200,
+    data: user.insertedId.toString()
   };
 });
 
-export const put = dbWrapper<{}, {}>(async ({ db, authenticatedUserId }) => {
-  if (!authenticatedUserId) {
-    return { statusCode: 401, error: 'Unauthenticated' };
+export const put = dbWrapper<Partial<User>, {}>(
+  async ({ db, authenticatedUserId, payload }) => {
+    if (!authenticatedUserId) {
+      return SERVER_ERROR.Unauthorized;
+    }
+    if (
+      payload.email ??
+      payload.oauthId ??
+      payload.followerCount ??
+      payload.followingCount ??
+      payload.eventsPredicting ??
+      payload.role
+    ) {
+      return {
+        ...SERVER_ERROR.Forbidden,
+        message: 'One or more fields are not directly editable'
+      };
+    }
+
+    // NOTE: This might not be the right node.js method
+    // https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/#mongodb-method-db.collection.updateOne
+    await db.collection<User>('users').updateOne(
+      {
+        _id: new ObjectId(authenticatedUserId)
+      },
+      payload
+    );
+
+    return {
+      statusCode: 200
+    };
   }
-  return {
-    statusCode: 200
-  };
-});
+);

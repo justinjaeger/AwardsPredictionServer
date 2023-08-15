@@ -132,6 +132,7 @@ export interface Token {
 
 export interface User {
   email: string;
+  oauthId?: string;
   username?: string;
   name?: string;
   bio?: string;
