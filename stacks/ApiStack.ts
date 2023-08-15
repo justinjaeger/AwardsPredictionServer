@@ -35,7 +35,6 @@ export function ApiStack({ stack }: StackContext) {
       "GET /users/{userId}": `${PATH}/user.get`,
       "GET /users/{userId}/following": `${PATH}/user.listFollowings`,
       "GET /users/{userId}/followers": `${PATH}/user.listFollowers`,
-
       "GET /users/search": `${PATH}/user.search`,
       "GET /relationships/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
       "GET /tokens": `${PATH}/token.get`, // uses payload from refreshToken
