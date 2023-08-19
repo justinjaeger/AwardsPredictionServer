@@ -14,6 +14,7 @@ import { Api, Cron, StackContext } from "sst/constructs";
  */
 
 const MONGODB_URI = `mongodb+srv://justinjaeger:${encodeURIComponent(process.env.MONGODB_PASSWORD || '')}@serverlessinstance0.0omknww.mongodb.net/?retryWrites=true&w=majority`;
+// const MONGODB_URI = `mongodb+srv://justinjaeger:${encodeURIComponent(process.env.MONGODB_PASSWORD || '')}@serverlessinstance0.0omknww.mongodb.net`;
 
 const PATH = "packages/functions/src";
 
@@ -31,36 +32,29 @@ export function ApiStack({ stack }: StackContext) {
     routes: {
       // GET
       "GET /": `${PATH}/test.get`, // for testing
-      "GET /user/{id}": `${PATH}/user.get`,
-      "GET /users/list": `${PATH}/user.list`,
-      "GET /users/following/{userId}": `${PATH}/user.listFollowings`,
-      "GET /users/follower/{userId}": `${PATH}/user.listFollowers`,
-      "GET /relationship/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
-      "GET /token/{token}": `${PATH}/token.get`, // not userId bc that will be passed in the header
-      "GET /predictionset/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
+      "GET /users/{userId}": `${PATH}/user.get`,
+      "GET /users/{userId}/following": `${PATH}/user.listFollowings`,
+      "GET /users/{userId}/followers": `${PATH}/user.listFollowers`,
+      "GET /users/search": `${PATH}/user.search`,
+      "GET /relationships/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
+      "GET /tokens": `${PATH}/token.get`, // uses payload from refreshToken
+      "GET /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
       "GET /jwt": `${PATH}/jwt.get`,
       // POST
-      "POST /user": `${PATH}/user.post`, // creating a user doesn't require an id
-      "POST /relationship/{followedUserId}": `${PATH}/relationship.post`,
-      "POST /token": `${PATH}/token.post`,
-      "POST /predictionset/{userId}/event/{eventId}": `${PATH}/predictionset.post`,
-      "POST /contender": `${PATH}/contender.post`,
-      "POST /movie": `${PATH}/movie.post`,
-      "POST /person": `${PATH}/person.post`,
-      "POST /song": `${PATH}/song.post`,
-      "POST /event": `${PATH}/event.post`, // ADMIN ONLY
+      "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
+      "POST /relationships": `${PATH}/relationship.post`,
+      "POST /tokens": `${PATH}/token.post`,
+      "POST /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.post`,
+      "POST /contenders": `${PATH}/contender.post`,
+      "POST /movies": `${PATH}/movie.post`,
+      "POST /persons": `${PATH}/person.post`,
+      "POST /songs": `${PATH}/song.post`,
       // PUT
-      "PUT /user": `${PATH}/user.put`, // userId derived from token
-      "PUT /event/{id}": `${PATH}/event.post`, // ADMIN ONLY
-      "PUT /contender/{id}": `${PATH}/contender.put`, // ADMIN ONLY
-      "PUT /movie/{id}": `${PATH}/movie.put`, // ADMIN ONLY
-      "PUT /person/{id}": `${PATH}/person.put`, // ADMIN ONLY
-      "PUT /song/{id}": `${PATH}/song.put`, // ADMIN ONLY
+      "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
-      "DELETE /relationship": `${PATH}/relationship.remove`,
-      "DELETE /token": `${PATH}/token.remove`,
-      "DELETE /tokens": `${PATH}/token.removeAllUserTokens`,
+      "DELETE /relationships": `${PATH}/relationship.remove`,
+      "DELETE /tokens": `${PATH}/token.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
     },
   });
 

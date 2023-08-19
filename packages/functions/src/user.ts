@@ -1,46 +1,216 @@
+import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
-import { type User } from './types/models';
+import {
+  type RelationshipWithUser,
+  type Relationship,
+  type User
+} from './types/models';
+import { paginateCursor, getAggregatePagination } from './helper/utils';
+import { SERVER_ERROR } from './types/responses';
 
-export const get = dbWrapper<Partial<User>>(async ({ db }) => {
-  return {
-    statusCode: 200,
-    data: {}
-  };
-});
+/**
+ * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
+ *
+ * To use "explain()" on aggregate, remove ?retryWrites=true&w=majority from MONGODB_URI
+ * .explain('executionStats'); (to get info on indexes)
+ *
+ * If experimenting with index speed, can use this to toggle indexes on and off:
+ * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
+ */
 
-export const list = dbWrapper<Array<Partial<User>>>(async ({ db }) => {
-  return {
-    statusCode: 200,
-    data: []
-  };
-});
+export const get = dbWrapper<{}, Partial<User>>(
+  async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
+    const projection = excludeNestedFields
+      ? { eventsPredicting: 0, recentPredictionSets: 0 }
+      : {};
 
-export const listFollowings = dbWrapper<Array<Partial<User>>>(
-  async ({ db }) => {
+    const filter = userId
+      ? { _id: new ObjectId(userId) }
+      : email
+      ? { email }
+      : oauthId
+      ? { oauthId }
+      : {};
+
+    if (Object.keys(filter).length === 0) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const user = await db
+      .collection<User>('users')
+      .findOne(filter, { projection });
+
+    if (!user) {
+      return {
+        ...SERVER_ERROR.NotFound,
+        message: 'User not found'
+      };
+    }
     return {
       statusCode: 200,
-      data: []
+      data: user
     };
   }
 );
 
-export const listFollowers = dbWrapper<Array<Partial<User>>>(async ({ db }) => {
+// TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
+export const search = dbWrapper<{}, Array<Partial<User>>>(
+  async ({ db, params: { query, limit, pageNumber } }) => {
+    if (!query) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const searchCursor = db.collection<User>('users').find({
+      $text: { $search: 'bro' }
+    });
+    paginateCursor(searchCursor, pageNumber, limit);
+    const userList = await searchCursor.toArray();
+
+    return {
+      statusCode: 200,
+      data: userList
+    };
+  }
+);
+
+/**
+ * If I want the recent predictions from who user is following,
+ * I can include includeRecentPredictionSets.
+ * Otherwise, I'll just basic information on who user is following.
+ */
+export const listFollowings = dbWrapper<{}, Array<Partial<User>>>(
+  async ({
+    db,
+    params: { userId, limit, pageNumber, includeRecentPredictionSets }
+  }) => {
+    if (!userId) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const followedUsers = await db
+      .collection<Relationship>('relationships')
+      .aggregate<RelationshipWithUser>([
+        {
+          $match: {
+            followingUserId: new ObjectId(userId)
+          }
+        },
+        {
+          $project: { _id: 0, followedUserId: 1 }
+        },
+        ...getAggregatePagination(pageNumber, limit),
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followedUserId',
+            foreignField: '_id',
+            as: 'followedUserList',
+            pipeline: [
+              {
+                $project: includeRecentPredictionSets
+                  ? { eventsPredicting: 0 }
+                  : { username: 1, name: 1, image: 1 }
+              }
+            ]
+          }
+        }
+      ])
+      .map(({ followedUserList }) => followedUserList[0])
+      .toArray();
+
+    return {
+      statusCode: 200,
+      data: followedUsers
+    };
+  }
+);
+
+export const listFollowers = dbWrapper<{}, Array<Partial<User>>>(
+  async ({ db, params: { userId, limit, pageNumber } }) => {
+    if (!userId) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const followedUsers = await db
+      .collection<Relationship>('relationships')
+      .aggregate<RelationshipWithUser>([
+        {
+          $match: {
+            followedUserId: new ObjectId(userId)
+          }
+        },
+        ...getAggregatePagination(pageNumber, limit),
+        {
+          $project: { _id: 0, followingUserId: 1 }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followingUserId',
+            foreignField: '_id',
+            as: 'followingUserList',
+            pipeline: [
+              {
+                $project: { username: 1, name: 1, image: 1 }
+              }
+            ]
+          }
+        }
+      ])
+      .map(({ followingUserList }) => followingUserList[0])
+      .toArray();
+
+    return {
+      statusCode: 200,
+      data: followedUsers
+    };
+  }
+);
+
+export const post = dbWrapper<
+  { email: string; name?: string; username?: string },
+  string // returns the user id
+>(async ({ db, payload: { email, name, username } }) => {
+  const newUser: User = {
+    email
+  };
+  if (name) newUser.name = name;
+  if (username) newUser.username = username;
+  const user = await db.collection<User>('users').insertOne(newUser);
   return {
     statusCode: 200,
-    data: []
+    data: user.insertedId.toString()
   };
 });
 
-export const post = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200,
-    data: null
-  };
-});
+export const put = dbWrapper<Partial<User>, {}>(
+  async ({ db, authenticatedUserId, payload }) => {
+    if (!authenticatedUserId) {
+      return SERVER_ERROR.Unauthorized;
+    }
+    if (
+      payload.email ??
+      payload.oauthId ??
+      payload.followerCount ??
+      payload.followingCount ??
+      payload.eventsPredicting ??
+      payload.role
+    ) {
+      return {
+        ...SERVER_ERROR.Forbidden,
+        message: 'One or more fields are not directly editable'
+      };
+    }
 
-export const put = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200,
-    data: null
-  };
-});
+    await db.collection<User>('users').updateOne(
+      {
+        _id: new ObjectId(authenticatedUserId)
+      },
+      { $set: payload }
+    );
+
+    return {
+      statusCode: 200
+    };
+  }
+);

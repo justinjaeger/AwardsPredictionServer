@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type Token } from './types/models';
 import Jwt from './helper/jwt';
+import { SERVER_ERROR } from './types/responses';
 
 /**
  * Pass refresh token in header
@@ -10,39 +11,35 @@ import Jwt from './helper/jwt';
  */
 export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   // the wrapper isn't going to let the refresh token pass, so handle it here
+
   const refreshToken = event?.headers?.Authorization?.split(' ')[1];
   if (!refreshToken) {
     return {
-      statusCode: 400,
-      error: 'BadRequest',
+      ...SERVER_ERROR.BadRequest,
       message: 'Requires token'
     };
   }
+
   const jwtPayload = Jwt.validateToken(refreshToken);
   const { userId, isRefreshToken } = jwtPayload ?? {};
   if (!isRefreshToken || !userId) {
     return {
-      statusCode: 401,
-      error: 'InvalidTokenError',
-      message: 'Invalid token'
+      ...SERVER_ERROR.InvalidTokenError,
+      message: 'Invalid refresh token'
     };
   }
-  const tokens = db.collection<Token>('tokens');
-  const dbToken = await tokens.findOne({
+
+  const dbToken = await db.collection<Token>('tokens').findOne({
     token: refreshToken,
     userId: new ObjectId(userId)
   });
   if (!dbToken) {
-    return {
-      statusCode: 403,
-      error: 'Forbidden',
-      message: 'No matching token in db - log the user out'
-    };
+    return SERVER_ERROR.RevokeAccess;
   }
-  const newAccessToken = Jwt.createAccessToken(userId);
+
   return {
     statusCode: 200,
-    data: newAccessToken
+    data: Jwt.createAccessToken(userId)
   };
 });
 
@@ -53,7 +50,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
 export const post = dbWrapper<{}, string>(
   async ({ db, authenticatedUserId }) => {
     if (!authenticatedUserId) {
-      return { statusCode: 401, error: 'Unauthenticated' };
+      return SERVER_ERROR.Unauthenticated;
     }
 
     const refreshToken = Jwt.createRefreshToken(authenticatedUserId);
@@ -72,26 +69,29 @@ export const post = dbWrapper<{}, string>(
 );
 
 /**
- * Deletes a refresh token
+ * Deletes a refresh token if token is passed
+ * Deletes all user tokens if userId is passed
  */
 export const remove = dbWrapper<{ token: string }, string>(
-  async ({ db, payload }) => {
-    const { token } = payload;
-    const tokens = db.collection<Token>('tokens');
-    await tokens.deleteOne({ token });
+  async ({ db, payload: { token }, authenticatedUserId: userId }) => {
+    if (!userId) {
+      return SERVER_ERROR.Unauthenticated;
+    }
 
-    return { statusCode: 200 };
-  }
-);
-
-/**
- * Deletes all tokens associated with a user
- */
-export const removeAllUserTokens = dbWrapper<{ userId: string }, string>(
-  async ({ db, payload }) => {
-    const { userId } = payload;
     const tokens = db.collection<Token>('tokens');
-    await tokens.deleteMany({ userId: new ObjectId(userId) });
+
+    if (!token && !userId) {
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: 'Missing body properties'
+      };
+    }
+
+    if (token) {
+      await tokens.deleteOne({ token });
+    } else if (userId) {
+      await tokens.deleteMany({ userId: new ObjectId(userId) });
+    }
 
     return { statusCode: 200 };
   }
