@@ -40,20 +40,19 @@ export const post = dbWrapper<
   };
 });
 
-export const remove = dbWrapper<
-  { followedUserId: string },
-  {} // sends back the new relationship id
->(async ({ db, payload: { followedUserId }, authenticatedUserId }) => {
-  if (!authenticatedUserId) {
-    return SERVER_ERROR.Unauthenticated;
+export const remove = dbWrapper<{ followedUserId: string }, {}>(
+  async ({ db, payload: { followedUserId }, authenticatedUserId }) => {
+    if (!authenticatedUserId) {
+      return SERVER_ERROR.Unauthenticated;
+    }
+
+    await db.collection<Relationship>('relationships').deleteOne({
+      followedUserId: new ObjectId(followedUserId),
+      followingUserId: new ObjectId(authenticatedUserId)
+    });
+
+    return {
+      statusCode: 200
+    };
   }
-
-  await db.collection<Relationship>('relationships').deleteOne({
-    followedUserId: new ObjectId(followedUserId),
-    followingUserId: new ObjectId(authenticatedUserId)
-  });
-
-  return {
-    statusCode: 200
-  };
-});
+);
