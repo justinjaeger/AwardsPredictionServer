@@ -170,13 +170,8 @@ export const listFollowers = dbWrapper<{}, Array<Partial<User>>>(
 export const post = dbWrapper<
   { email: string; name?: string; username?: string },
   string // returns the user id
->(async ({ db, payload: { email, name, username } }) => {
-  const newUser: User = {
-    email
-  };
-  if (name) newUser.name = name;
-  if (username) newUser.username = username;
-  const user = await db.collection<User>('users').insertOne(newUser);
+>(async ({ db, payload }) => {
+  const user = await db.collection<User>('users').insertOne(payload);
   return {
     statusCode: 200,
     data: user.insertedId.toString()

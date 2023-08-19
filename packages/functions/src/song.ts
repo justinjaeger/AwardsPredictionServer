@@ -1,13 +1,10 @@
 import { dbWrapper } from './helper/wrapper';
+import { type Song } from './types/models';
 
-export const post = dbWrapper(async ({ db }) => {
+export const post = dbWrapper<Song, string>(async ({ db, payload }) => {
+  const song = await db.collection<Song>('songs').insertOne(payload);
   return {
-    statusCode: 200
-  };
-});
-
-export const put = dbWrapper(async ({ db }) => {
-  return {
-    statusCode: 200
+    statusCode: 200,
+    data: song.insertedId.toString()
   };
 });
