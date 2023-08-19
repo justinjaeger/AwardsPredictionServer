@@ -202,13 +202,11 @@ export const put = dbWrapper<Partial<User>, {}>(
       };
     }
 
-    // NOTE: This might not be the right node.js method
-    // https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/#mongodb-method-db.collection.updateOne
     await db.collection<User>('users').updateOne(
       {
         _id: new ObjectId(authenticatedUserId)
       },
-      payload
+      { $set: payload }
     );
 
     return {
