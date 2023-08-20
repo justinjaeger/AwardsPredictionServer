@@ -26,6 +26,7 @@ export function ApiStack({ stack }: StackContext) {
         environment: {
           MONGODB_URI: MONGODB_URI,
           JWT_SECRET: process.env.JWT_SECRET || '',
+          TMDB_API_KEY: process.env.TMDB_API_KEY || '',
         },
       },
     },

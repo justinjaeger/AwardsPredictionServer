@@ -2,7 +2,7 @@ export type ApiResponse<T> = {
   statusCode: number;
   data?: T;
   error?: string;
-  message?: string;
+  message?: string; // a user-facing message
 };
 
 export type ErrorResponse = {

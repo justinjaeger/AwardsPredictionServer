@@ -27,9 +27,9 @@ export interface CategoryUpdateLog {
 export interface Contender {
   eventId: ObjectId;
   movieId: ObjectId;
-  visible: boolean;
   category: CategoryName;
-  numPredicting: Record<string, number>;
+  isHidden?: boolean;
+  numPredicting?: Record<string, number>;
   accolade?: Phase;
   songId?: ObjectId;
   personId?: ObjectId;
@@ -52,23 +52,27 @@ export interface EventModel {
   winDateTime?: Date;
 }
 
+export type IMovieCategoryCredit =
+  | 'directing'
+  | 'screenplay'
+  | 'cinematography'
+  | 'costumes'
+  | 'editing'
+  | 'productionDesign'
+  | 'score'
+  | 'vfx';
+
 export interface Movie {
   tmdbId: number;
   title: string;
+  year?: number;
   studio?: string;
   plot?: string;
+  imdbId?: string;
   cast?: string;
   posterPath?: string;
-  categoryInfo: {
-    director?: string;
-    screenplay?: string;
-    cinematography?: string;
-    costumes?: string;
-    editing?: string;
-    productionDesign?: string;
-    score?: string;
-    visualEffects?: string;
-  };
+  backdropPath?: string;
+  categoryCredits: Record<IMovieCategoryCredit, string[]>;
 }
 
 export interface Person {
