@@ -7,14 +7,9 @@ import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
 
 /**
- * Movies are created when a user creates a contender
- * I guess we can pass the tmdbId, and if it doesn't exist,
- * fetch the TMDB data and create it.
- * Then we'll never actually need the movie/post endpoint.
- * Or maybe this should be two separate endpoints? Because they can run both simultaneously.
- * They can send movie/post{tmdbId} AND create a contender with the tmdbId. But we'd want link it to a movieId right?
- * Yeah we do so nevermind. We'll need to create a movie first. But we can do that in this endpoint
+ * Creates movie/person/song if not exists, then creates contender
  */
+// TODO: untested
 export const post = dbWrapper<{
   eventId: string;
   movieTmdbId: number;

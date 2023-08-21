@@ -1,16 +1,8 @@
-import { type Db, MongoClient, ServerApiVersion } from 'mongodb';
-
-// Once we connect to the database once, we'll store that connection
-// and reuse it so that we don't have to connect to the database on every request.
-let cachedDb: Db | undefined;
+import { MongoClient, ServerApiVersion } from 'mongodb';
 
 // https://docs.sst.dev/console
 
-const connectToDatabase = async () => {
-  if (cachedDb != null) {
-    return cachedDb;
-  }
-
+const connectToDatabase = () => {
   if (!process.env.MONGODB_URI) {
     console.error('No MongoDB uri was found!');
   }
@@ -19,18 +11,15 @@ const connectToDatabase = async () => {
   const client = new MongoClient(process.env.MONGODB_URI, {
     serverApi: {
       version: ServerApiVersion.v1,
-      strict: true,
+      strict: false, // NOTE: needs to be true in prod
       deprecationErrors: true
     }
   });
 
-  // Connect to our MongoDB database hosted on MongoDB Atlas
-  // const client = await MongoClient.connect(process.env.MONGODB_URI);
-
   // Specify which database we want to use
-  cachedDb = client.db('db');
+  const db = client.db('db');
 
-  return cachedDb;
+  return { db, client };
 };
 
 export default connectToDatabase;

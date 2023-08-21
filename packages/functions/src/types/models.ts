@@ -29,7 +29,6 @@ export interface Contender {
   movieId: ObjectId;
   category: CategoryName;
   isHidden?: boolean;
-  numPredicting?: Record<string, number>;
   accolade?: Phase;
   songId?: ObjectId;
   personId?: ObjectId;
@@ -82,35 +81,41 @@ export interface Person {
   posterPath?: string;
 }
 
+export type iPredictions = Array<{
+  contenderId: ObjectId;
+  ranking: number;
+  movie: {
+    tmdbId: number;
+    title: string;
+    posterPath?: string;
+  };
+  person?: {
+    tmdbId: number;
+    name: string;
+    posterPath?: string;
+  };
+  song?: {
+    title: string;
+    artist?: string;
+  };
+}>;
+
+export type iCategoryPrediction = {
+  type: CategoryType;
+  phase?: Phase | undefined;
+  yyyymmdd: number;
+  predictions: iPredictions;
+};
+
 export interface PredictionSet {
-  userId: ObjectId;
+  userId: ObjectId | 'community';
   eventId: ObjectId;
   yyyymmdd: number;
-  categories: Record<
-    CategoryName,
-    {
-      type: CategoryType;
-      phase?: Phase;
-      predictions: Array<{
-        contenderId: ObjectId;
-        ranking: number;
-        movie: {
-          tmdbId: number;
-          title: string;
-          posterPath?: string;
-        };
-        person?: {
-          tmdbId: number;
-          name: string;
-          posterPath?: string;
-        };
-        song?: {
-          title: string;
-          artist?: string;
-        };
-      }>;
-    }
-  >;
+  // eslint-disable-next-line @typescript-eslint/consistent-indexed-object-style
+  categories: {
+    // @ts-expect-error - I don't want to force every every CategoryName to be a key, just some
+    [key: CategoryName]: iCategoryPrediction;
+  };
 }
 
 export interface Relationship {
@@ -144,32 +149,12 @@ export interface User {
   followingCount?: number;
   followerCount?: number;
   eventsPredicting?: ObjectId[];
-  recentPredictionSets?: [
-    {
-      awardsBody: string;
-      category: string;
-      year: string;
-      predictionSetId: ObjectId;
-      createdAt: Date;
-      topPredictions: [
-        {
-          ranking: number;
-          movie: {
-            tmdbId: number;
-            title: string;
-            posterPath: string;
-          };
-          person?: {
-            tmdbId: number;
-            name: string;
-            profilePath: string;
-          };
-          song?: {
-            title: string;
-            artist?: string;
-          };
-        }
-      ];
-    }
-  ];
+  recentPredictionSets?: Array<{
+    awardsBody: string;
+    category: string;
+    year: number;
+    predictionSetId: ObjectId;
+    createdAt: Date;
+    topPredictions: iPredictions;
+  }>;
 }
