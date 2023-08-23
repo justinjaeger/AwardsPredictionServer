@@ -1,16 +1,21 @@
-import { type Filter, ObjectId, type FindOptions } from 'mongodb';
+import {
+  type Filter,
+  ObjectId,
+  type FindOptions,
+  type InsertOneResult,
+  type UpdateResult
+} from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type iPredictions,
   type EventModel,
   type PredictionSet,
-  type iCategoryPrediction,
   type User,
   type CategoryUpdateLog
 } from './types/models';
-import { type CategoryName } from './types/enums';
+import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
-import { getTodayYyyymmdd } from './helper/utils';
+import { getTodayYyyymmdd, getTomorrowYyyymmdd } from './helper/utils';
 import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
 
 // if we want to get a community prediction set, we can make the userId "community"
@@ -83,8 +88,11 @@ export const get = dbWrapper<
 
 /**
  * Updates a single category that the user is predicting with new array of predictions
- * Transactionally updates the predictionset, the user's recentPredictionSets, and the categoryUpdateLogs
- * TODO: not handling the case where there's a phase overwrite. Need to think about that
+ * Atomically updates the predictionset, the user's recentPredictionSets, and the categoryUpdateLogs
+ * If there is a phase conflict, for ex: a category is SHORTLISTED, so we're now predicting the shortlist, but earlier in the day it was not:
+ * - it will create a new predictionset for the next day
+ * - we're comfortable with this so we don't overwrite the FINAL predictions for some leaderboard event
+ * - the first prediction they make on the now-shortlisted category can just come the next day
  * TODO: untested
  */
 export const post = dbWrapper<
@@ -125,33 +133,120 @@ export const post = dbWrapper<
     const { awardsBody, year } = event;
     const { type: categoryType, phase: categoryPhase } = category;
 
-    const yyyymmdd = getTodayYyyymmdd();
+    if (categoryPhase === Phase.CLOSED) {
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: `Category is closed for predictions while leaderboards are compiled.`
+      };
+    }
 
-    // declaring it outside so I can type it
-    const newCategory: iCategoryPrediction = {
-      type: categoryType,
-      phase: categoryPhase,
-      yyyymmdd,
-      predictions
-    };
+    const todayYyyymmdd = getTodayYyyymmdd();
+    const tomorrowYyyymmdd = getTomorrowYyyymmdd();
 
-    // upsert the predictionset
-    const predictionSetRequest = db
+    const mostRecentPredictionSet = await db
       .collection<PredictionSet>('predictionsets')
-      .updateOne(
-        {
-          userId: new ObjectId(userId),
-          eventId: new ObjectId(eventId),
-          yyyymmdd // always write to today's yyyymmdd
-        },
-        {
-          $set: {
-            [`categories.$.${categoryName}`]: newCategory
-          }
-        },
-        // IMPORTANT: If query doesn't match, it creates a new document
-        { upsert: true, session }
+      .findOne(
+        { userId: new ObjectId(userId), eventId: new ObjectId(eventId) },
+        { sort: { yyyymmdd: -1 } }
       );
+
+    let predictionSetRequest:
+      | Promise<InsertOneResult<PredictionSet>>
+      | Promise<UpdateResult<PredictionSet>>;
+
+    let finalYyyymmdd: number | undefined;
+    // handle cases for updating an existing prediction set vs creating a new one
+    if (mostRecentPredictionSet) {
+      const latestYyyymmdd = mostRecentPredictionSet.yyyymmdd;
+      const latestCategoryPhase =
+        mostRecentPredictionSet.categories?.[categoryName]?.phase;
+
+      let requiresNewEntry: boolean = false;
+      let newEntryYyyymmdd: number | undefined; // undefined if it doesn't require a new entry
+      // if the latest predictionset is in the past, we'll need to create a new predictionset
+      if (latestYyyymmdd < todayYyyymmdd) {
+        requiresNewEntry = true;
+        newEntryYyyymmdd = todayYyyymmdd;
+      } else if (latestYyyymmdd >= todayYyyymmdd) {
+        // if it's for today or later, has the category phase changed?
+        if (
+          latestCategoryPhase !== categoryPhase && // if the category phase has changed since last update
+          latestYyyymmdd <= todayYyyymmdd // and the date of the former entry is NOT in future (which would mean we already switched to tomorrow for some other category, and we don't want to do that)
+        ) {
+          // we need to create a new predictionset for TOMORROW to avoid overwriting phases
+          requiresNewEntry = true;
+          newEntryYyyymmdd = tomorrowYyyymmdd;
+        }
+        // if category phase has not changed, we'll just update the current predictionset
+        else {
+          requiresNewEntry = false;
+          newEntryYyyymmdd = undefined;
+        }
+      }
+      if (requiresNewEntry && newEntryYyyymmdd !== undefined) {
+        // create a copy of the most recent predictionset, but with a new yyyymmdd, and update the category
+        finalYyyymmdd = newEntryYyyymmdd;
+        predictionSetRequest = db
+          .collection<PredictionSet>('predictionsets')
+          .insertOne(
+            {
+              ...mostRecentPredictionSet,
+              yyyymmdd: finalYyyymmdd,
+              categories: {
+                ...mostRecentPredictionSet.categories,
+                [categoryName]: {
+                  type: categoryType,
+                  phase: categoryPhase,
+                  createdAt: new Date(),
+                  predictions
+                }
+              }
+            },
+            { session }
+          );
+      } else {
+        // update the current prediction set
+        finalYyyymmdd = latestYyyymmdd;
+        predictionSetRequest = db
+          .collection<PredictionSet>('predictionsets')
+          .updateOne(
+            { _id: mostRecentPredictionSet._id },
+            {
+              $set: {
+                [`categories.$.${categoryName}`]: {
+                  type: categoryType,
+                  phase: categoryPhase,
+                  createdAt: new Date(),
+                  predictions
+                }
+              }
+            },
+            { session }
+          );
+      }
+    } else {
+      // create it if it doesn't exist. means it's the first prediction the user has made for this event
+      finalYyyymmdd = todayYyyymmdd;
+      predictionSetRequest = db
+        .collection<PredictionSet>('predictionsets')
+        .insertOne(
+          {
+            userId: new ObjectId(userId),
+            eventId: new ObjectId(eventId),
+            yyyymmdd: finalYyyymmdd,
+            // @ts-expect-error - This should only have partial data
+            categories: {
+              [categoryName]: {
+                type: categoryType,
+                phase: categoryPhase,
+                createdAt: new Date(),
+                predictions
+              }
+            }
+          },
+          { session }
+        );
+    }
 
     // update the user's recentPredictionSets, setting the new one at the top of the list
     const user = await db
@@ -191,13 +286,14 @@ export const post = dbWrapper<
           eventId: new ObjectId(eventId),
           category: categoryName
         },
-        { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
+        { $set: { [`yyyymmddUpdates.$.${finalYyyymmdd}`]: true } },
         { upsert: true, session } // useful the first time a user updates a category
       );
 
+    // atomically execute all three requests
+    // Important:: You must pass the session to all requests!!
     try {
       await session.withTransaction(async () => {
-        // Important:: You must pass the session to the operations
         await predictionSetRequest;
         await userRequest;
         await categoryUpdateLogsRequest;

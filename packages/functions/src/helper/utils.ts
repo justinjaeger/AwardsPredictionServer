@@ -21,3 +21,11 @@ export const getTodayYyyymmdd = () => {
     `${today.getFullYear()}${today.getMonth()}${today.getDate()}`
   );
 };
+
+export const getTomorrowYyyymmdd = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return parseInt(
+    `${tomorrow.getFullYear()}${tomorrow.getMonth()}${tomorrow.getDate()}`
+  );
+};

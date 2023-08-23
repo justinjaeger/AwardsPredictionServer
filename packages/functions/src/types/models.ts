@@ -102,9 +102,9 @@ export type iPredictions = Array<{
 
 export type iCategoryPrediction = {
   type: CategoryType;
-  phase?: Phase | undefined;
-  yyyymmdd: number;
+  createdAt: Date;
   predictions: iPredictions;
+  phase?: Phase | undefined;
 };
 
 export interface PredictionSet {
@@ -113,8 +113,7 @@ export interface PredictionSet {
   yyyymmdd: number;
   // eslint-disable-next-line @typescript-eslint/consistent-indexed-object-style
   categories: {
-    // @ts-expect-error - I don't want to force every every CategoryName to be a key, just some
-    [key: CategoryName]: iCategoryPrediction;
+    [key in CategoryName]: iCategoryPrediction;
   };
 }
 
