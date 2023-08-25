@@ -1,14 +1,33 @@
+import { ObjectId, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type Movie } from './types/models';
 
 /**
- * Movies are created by users (no permissions, except we cannot tolerate duplicates)
- * But they're updated by either ADMIN or cron job
+ * Gets a batch of movie data,
+ * which is updated behind the scenes from tmdb
+ * Fake POST request so I can use the body
  */
-export const post = dbWrapper<Movie, string>(async ({ db, payload }) => {
-  const movie = await db.collection<Movie>('movies').insertOne(payload);
-  return {
-    statusCode: 200,
-    data: movie.insertedId.toString()
-  };
-});
+export const getBatch = dbWrapper<string[], Record<string, Movie>>(
+  async ({ db, payload: ids }) => {
+    const movieRequests: Array<Promise<WithId<Movie> | null>> = [];
+    for (const id of ids) {
+      movieRequests.push(
+        db.collection<Movie>('movies').findOne({
+          _id: new ObjectId(id)
+        })
+      );
+    }
+    const movieIdToData: Record<string, Movie> = {};
+    const movies = await Promise.all(movieRequests);
+    movies.forEach((movie) => {
+      if (movie) {
+        movieIdToData[movie._id.toString()] = movie;
+      }
+    });
+
+    return {
+      statusCode: 200,
+      data: movieIdToData
+    };
+  }
+);

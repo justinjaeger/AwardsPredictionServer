@@ -29,8 +29,8 @@ export function dbWrapper<Req = {}, Res = {}>(
     const payload = event.body ? JSON.parse(event.body) : {};
     // connect to mongodb
     const { db, client } = connect();
-    // decode userId from jwt
-    const accessToken = event?.headers?.Authorization?.split(' ')[1];
+    // decode userId from jwt (header looks like "Authorization: Bearer <token>")
+    const accessToken = event?.headers?.Authorization?.split(' ')[2];
     let authenticatedUserId: string | undefined;
     if (accessToken) {
       try {

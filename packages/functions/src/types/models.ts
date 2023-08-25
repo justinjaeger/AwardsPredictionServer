@@ -32,6 +32,7 @@ export interface Contender {
   accolade?: Phase;
   songId?: ObjectId;
   personId?: ObjectId;
+  numPredicting?: Record<number, number>;
 }
 
 export interface EventModel {
@@ -84,20 +85,10 @@ export interface Person {
 export type iPredictions = Array<{
   contenderId: ObjectId;
   ranking: number;
-  movie: {
-    tmdbId: number;
-    title: string;
-    posterPath?: string;
-  };
-  person?: {
-    tmdbId: number;
-    name: string;
-    posterPath?: string;
-  };
-  song?: {
-    title: string;
-    artist?: string;
-  };
+  movieId: ObjectId;
+  personId?: ObjectId;
+  songId?: ObjectId;
+  numPredicting?: Record<number, number>; // only applies to community predictions
 }>;
 
 export type iCategoryPrediction = {

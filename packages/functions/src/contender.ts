@@ -9,7 +9,7 @@ import { SERVER_ERROR } from './types/responses';
 /**
  * Creates movie/person/song if not exists, then creates contender
  */
-// TODO: untested
+// TODO: untested on people and songs (movie works)
 export const post = dbWrapper<{
   eventId: string;
   movieTmdbId: number;

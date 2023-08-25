@@ -25,44 +25,38 @@ export const get = dbWrapper<
     excludeNestedFields?: boolean;
   },
   Partial<User>
->(
-  async ({
-    db,
-    params: { userId },
-    payload: { email, oauthId, excludeNestedFields }
-  }) => {
-    const projection = excludeNestedFields
-      ? { eventsPredicting: 0, recentPredictionSets: 0 }
-      : {};
+>(async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
+  const projection = excludeNestedFields
+    ? { eventsPredicting: 0, recentPredictionSets: 0 }
+    : {};
 
-    const filter = userId
-      ? { _id: new ObjectId(userId) }
-      : email
-      ? { email }
-      : oauthId
-      ? { oauthId }
-      : {};
+  const filter = userId
+    ? { _id: new ObjectId(userId) }
+    : email
+    ? { email }
+    : oauthId
+    ? { oauthId }
+    : {};
 
-    if (Object.keys(filter).length === 0) {
-      return SERVER_ERROR.BadRequest;
-    }
+  if (Object.keys(filter).length === 0) {
+    return SERVER_ERROR.BadRequest;
+  }
 
-    const user = await db
-      .collection<User>('users')
-      .findOne(filter, { projection });
+  const user = await db
+    .collection<User>('users')
+    .findOne(filter, { projection });
 
-    if (!user) {
-      return {
-        ...SERVER_ERROR.NotFound,
-        message: 'User not found'
-      };
-    }
+  if (!user) {
     return {
-      statusCode: 200,
-      data: user
+      ...SERVER_ERROR.NotFound,
+      message: 'User not found'
     };
   }
-);
+  return {
+    statusCode: 200,
+    data: user
+  };
+});
 
 // TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
 export const search = dbWrapper<

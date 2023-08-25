@@ -11,6 +11,7 @@ import { Api, Cron, StackContext } from "sst/constructs";
  * API naming best practices:
  * https://restfulapi.net/resource-naming/
  * 
+ * Note: when making an update, it might let you use the console even though it's stale, so just give it like ten minutes to sync
  */
 
 const MONGODB_URI = `mongodb+srv://justinjaeger:${encodeURIComponent(process.env.MONGODB_PASSWORD || '')}@serverlessinstance0.0omknww.mongodb.net/?retryWrites=true&w=majority`;
@@ -42,15 +43,16 @@ export function ApiStack({ stack }: StackContext) {
       "GET /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
       "GET /jwt": `${PATH}/jwt.get`,
+      // (fake post requests)
+      "POST /movies": `${PATH}/movie.getBatch`,
+      "POST /persons": `${PATH}/movie.getBatch`,
+      "POST /songs": `${PATH}/movie.getBatch`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationships": `${PATH}/relationship.post`,
       "POST /tokens": `${PATH}/token.post`,
-      "POST /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.post`,
+      "POST /predictionsets": `${PATH}/predictionset.post`,
       "POST /contenders": `${PATH}/contender.post`,
-      "POST /movies": `${PATH}/movie.post`,
-      "POST /persons": `${PATH}/person.post`,
-      "POST /songs": `${PATH}/song.post`,
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
