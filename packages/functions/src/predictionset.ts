@@ -15,7 +15,7 @@ import {
 } from './types/models';
 import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
-import { getTodayYyyymmdd, getTomorrowYyyymmdd } from './helper/utils';
+import { dateToYyyymmdd } from './helper/utils';
 import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
 
 // TODO: untested
@@ -109,8 +109,10 @@ export const post = dbWrapper<
       };
     }
 
-    const todayYyyymmdd = getTodayYyyymmdd();
-    const tomorrowYyyymmdd = getTomorrowYyyymmdd();
+    const d = new Date();
+    const todayYyyymmdd = dateToYyyymmdd(d);
+    d.setDate(d.getDate() + 1); // increment to tomorrow
+    const tomorrowYyyymmdd = dateToYyyymmdd(d);
 
     const mostRecentPredictionSet = await db
       .collection<PredictionSet>('predictionsets')
