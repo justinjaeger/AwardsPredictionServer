@@ -18,7 +18,13 @@ import { SERVER_ERROR } from './types/responses';
 import { dateToYyyymmdd } from './helper/utils';
 import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
 
-// TODO: untested
+/**
+ * Get the most recent predictionset if yyyymmdd is not provided
+ * Else, get a predictionset for a specific date
+ *
+ * If categoryName is provided, only return that category
+ * // TODO: untested
+ */
 export const get = dbWrapper<
   { yyyymmdd: number; categoryName?: CategoryName },
   PredictionSet
@@ -28,7 +34,6 @@ export const get = dbWrapper<
     params: { userId, eventId, yyyymmdd: yyyymmddString, categoryName }
   }) => {
     const yyyymmdd = yyyymmddString ? parseInt(yyyymmddString) : undefined;
-    // get most recent
     const filter: Filter<PredictionSet> = {
       userId: new ObjectId(userId),
       eventId: new ObjectId(eventId)
@@ -43,7 +48,7 @@ export const get = dbWrapper<
     }
     // we might want to return ONLY a specific category, so this would enable that
     if (categoryName) {
-      options.projection = { [`CATEGORIES.${categoryName}`]: 1 };
+      options.projection = { [`categories.${categoryName}`]: 1 };
     }
     const predictionSet = await db
       .collection<PredictionSet>('predictionsets')
@@ -90,7 +95,7 @@ export const post = dbWrapper<
       .collection<EventModel>('events')
       .findOne(
         { _id: new ObjectId(eventId) },
-        { projection: { [`CATEGORIES.${categoryName}`]: 1 } }
+        { projection: { [`categories.${categoryName}`]: 1 } }
       );
     const category = event?.categories[categoryName];
     if (!category) {
@@ -99,9 +104,20 @@ export const post = dbWrapper<
         message: `Category ${categoryName} not found on event`
       };
     }
-    const { awardsBody, year } = event;
-    const { type: categoryType, phase: categoryPhase } = category;
+    const { awardsBody, year, nomDateTime, winDateTime } = event;
+    const {
+      type: categoryType,
+      phase: categoryPhase,
+      shortlistDateTime
+    } = category;
 
+    // winDateTime is when we close predictions for the winner ceremony
+    if (winDateTime && winDateTime < new Date()) {
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: `Final predictions have ended. Pencils down!`
+      };
+    }
     if (categoryPhase === Phase.CLOSED) {
       return {
         ...SERVER_ERROR.BadRequest,
@@ -109,11 +125,31 @@ export const post = dbWrapper<
       };
     }
 
+    // get today and tomorrow's yyyymmdd
     const d = new Date();
     const todayYyyymmdd = dateToYyyymmdd(d);
     d.setDate(d.getDate() + 1); // increment to tomorrow
     const tomorrowYyyymmdd = dateToYyyymmdd(d);
 
+    // determine whether we need to write to today or tomorrow to preserve final predictions
+    // predictions post-nom/shortlist on the day of transition will count towards the next day
+    let yyyymmdd: number = todayYyyymmdd;
+    const shortlistTimeHasPassed =
+      shortlistDateTime && shortlistDateTime < new Date();
+    const shortlistHappenedToday =
+      shortlistDateTime && todayYyyymmdd === dateToYyyymmdd(shortlistDateTime);
+    // nomDateTime is when we close predictions for the nomination announcement
+    const nomDateTimeHasPassed = nomDateTime && nomDateTime < new Date();
+    const nomHappenedToday =
+      nomDateTime && todayYyyymmdd === dateToYyyymmdd(nomDateTime);
+    const logPredictionsAsTomorrow =
+      !!(shortlistTimeHasPassed && shortlistHappenedToday) ||
+      !!(nomDateTimeHasPassed && nomHappenedToday);
+    if (logPredictionsAsTomorrow) {
+      yyyymmdd = tomorrowYyyymmdd;
+    }
+
+    // get most recent to copy over if it's an update
     const mostRecentPredictionSet = await db
       .collection<PredictionSet>('predictionsets')
       .findOne(
@@ -125,44 +161,38 @@ export const post = dbWrapper<
       | Promise<InsertOneResult<PredictionSet>>
       | Promise<UpdateResult<PredictionSet>>;
 
-    let finalYyyymmdd: number | undefined;
-    // handle cases for updating an existing prediction set vs creating a new one
-    if (mostRecentPredictionSet) {
-      const latestYyyymmdd = mostRecentPredictionSet.yyyymmdd;
-      const latestCategoryPhase =
-        mostRecentPredictionSet.categories?.[categoryName]?.phase;
-
-      let requiresNewEntry: boolean = false;
-      let newEntryYyyymmdd: number | undefined; // undefined if it doesn't require a new entry
-      // if the latest predictionset is in the past, we'll need to create a new predictionset
-      if (latestYyyymmdd < todayYyyymmdd) {
-        requiresNewEntry = true;
-        newEntryYyyymmdd = todayYyyymmdd;
-      } else if (latestYyyymmdd >= todayYyyymmdd) {
-        // if it's for today or later, has the category phase changed?
-        if (
-          latestCategoryPhase !== categoryPhase && // if the category phase has changed since last update
-          latestYyyymmdd <= todayYyyymmdd // and the date of the former entry is NOT in future (which would mean we already switched to tomorrow for some other category, and we don't want to do that)
-        ) {
-          // we need to create a new predictionset for TOMORROW to avoid overwriting phases
-          requiresNewEntry = true;
-          newEntryYyyymmdd = tomorrowYyyymmdd;
-        }
-        // if category phase has not changed, we'll just update the current predictionset
-        else {
-          requiresNewEntry = false;
-          newEntryYyyymmdd = undefined;
-        }
-      }
-      if (requiresNewEntry && newEntryYyyymmdd !== undefined) {
+    // create predictionset if it doesn't exist. means it's the first prediction the user has made for this event
+    if (!mostRecentPredictionSet) {
+      predictionSetRequest = db
+        .collection<PredictionSet>('predictionsets')
+        .insertOne(
+          {
+            userId: new ObjectId(userId),
+            eventId: new ObjectId(eventId),
+            yyyymmdd,
+            // @ts-expect-error - This should only have partial data
+            categories: {
+              [categoryName]: {
+                type: categoryType,
+                phase: categoryPhase,
+                createdAt: new Date(),
+                predictions
+              }
+            }
+          },
+          { session }
+        );
+      // else if predictionset exists for event, update it
+    } else {
+      const requiresNewEntry = yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
+      if (requiresNewEntry) {
         // create a copy of the most recent predictionset, but with a new yyyymmdd, and update the category
-        finalYyyymmdd = newEntryYyyymmdd;
         predictionSetRequest = db
           .collection<PredictionSet>('predictionsets')
           .insertOne(
             {
               ...mostRecentPredictionSet,
-              yyyymmdd: finalYyyymmdd,
+              yyyymmdd,
               categories: {
                 ...mostRecentPredictionSet.categories,
                 [categoryName]: {
@@ -177,7 +207,6 @@ export const post = dbWrapper<
           );
       } else {
         // update the current prediction set
-        finalYyyymmdd = latestYyyymmdd;
         predictionSetRequest = db
           .collection<PredictionSet>('predictionsets')
           .updateOne(
@@ -195,28 +224,6 @@ export const post = dbWrapper<
             { session }
           );
       }
-    } else {
-      // create it if it doesn't exist. means it's the first prediction the user has made for this event
-      finalYyyymmdd = todayYyyymmdd;
-      predictionSetRequest = db
-        .collection<PredictionSet>('predictionsets')
-        .insertOne(
-          {
-            userId: new ObjectId(userId),
-            eventId: new ObjectId(eventId),
-            yyyymmdd: finalYyyymmdd,
-            // @ts-expect-error - This should only have partial data
-            categories: {
-              [categoryName]: {
-                type: categoryType,
-                phase: categoryPhase,
-                createdAt: new Date(),
-                predictions
-              }
-            }
-          },
-          { session }
-        );
     }
 
     // update the user's recentPredictionSets, setting the new one at the top of the list
@@ -257,7 +264,7 @@ export const post = dbWrapper<
           eventId: new ObjectId(eventId),
           category: categoryName
         },
-        { $set: { [`yyyymmddUpdates.$.${finalYyyymmdd}`]: true } },
+        { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
         { upsert: true, session } // useful the first time a user updates a category
       );
 
