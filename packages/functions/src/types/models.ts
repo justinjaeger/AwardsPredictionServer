@@ -102,7 +102,6 @@ export interface PredictionSet {
   userId: ObjectId | 'community';
   eventId: ObjectId;
   yyyymmdd: number;
-  // eslint-disable-next-line @typescript-eslint/consistent-indexed-object-style
   categories: {
     [key in CategoryName]: iCategoryPrediction;
   };
