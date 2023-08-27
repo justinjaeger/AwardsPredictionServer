@@ -17,6 +17,7 @@ import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
 import { dateToYyyymmdd } from './helper/utils';
 import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
+import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
 
 /**
  * Get the most recent predictionset if yyyymmdd is not provided
@@ -133,21 +134,12 @@ export const post = dbWrapper<
 
     // determine whether we need to write to today or tomorrow to preserve final predictions
     // predictions post-nom/shortlist on the day of transition will count towards the next day
-    let yyyymmdd: number = todayYyyymmdd;
-    const shortlistTimeHasPassed =
-      shortlistDateTime && shortlistDateTime < new Date();
-    const shortlistHappenedToday =
-      shortlistDateTime && todayYyyymmdd === dateToYyyymmdd(shortlistDateTime);
-    // nomDateTime is when we close predictions for the nomination announcement
-    const nomDateTimeHasPassed = nomDateTime && nomDateTime < new Date();
-    const nomHappenedToday =
-      nomDateTime && todayYyyymmdd === dateToYyyymmdd(nomDateTime);
-    const logPredictionsAsTomorrow =
-      !!(shortlistTimeHasPassed && shortlistHappenedToday) ||
-      !!(nomDateTimeHasPassed && nomHappenedToday);
-    if (logPredictionsAsTomorrow) {
-      yyyymmdd = tomorrowYyyymmdd;
-    }
+    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
+      nomDateTime,
+      shortlistDateTime
+    )
+      ? tomorrowYyyymmdd
+      : todayYyyymmdd;
 
     // get most recent to copy over if it's an update
     const mostRecentPredictionSet = await db

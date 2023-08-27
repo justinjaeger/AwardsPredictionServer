@@ -1,58 +1,199 @@
+/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
+import { ObjectId } from 'mongodb';
+import { COMMUNITY_USER_ID } from 'src/helper/constants';
+import { getContenderPoints } from 'src/helper/getContenderPoints';
+import { shouldLogPredictionsAsTomorrow } from 'src/helper/shouldLogPredictionsAsTomorrow';
+import { dateToYyyymmdd } from 'src/helper/utils';
 import { dbWrapper } from 'src/helper/wrapper';
+import { EventStatus } from 'src/types/enums';
+import {
+  type iCategoryPrediction,
+  type EventModel,
+  type PredictionSet,
+  type iPredictions
+} from 'src/types/models';
 
 export const handler = dbWrapper(async ({ db }) => {
-  // I think this is going to loop through the contenders right?
   // Calculate numPredicting by querying user predictionsets with yyyymmdd that is <30 days ago
-  // Tallies up every single prediction
-  // while doing this, also manually filter for categories that have not been updated in the last 30 days, with its lastUpdated field
-  // for each event, create or update a predictionset for user where userId = "community"
-  // and make sure, with each CONTENDER, to write to a numPredicting field. Very important since this is the tally for each contender.
-  // I mean this inside of each prediction, as well as with each Contender collection
-  // there are going to be like 1000 contenders per event but it's fine, this is once every hour consistently
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const todayYyyymmdd = dateToYyyymmdd(new Date());
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const tomorrowYyyymmdd = dateToYyyymmdd(d);
 
-  // When creating the PredictionSet, we're going to want to respect the same rule as user predictions
-  // where we create a predictionset for the next day if any category has changed phases!!
+  // get list of events that are not archived, we'll query only those prediction sets
+  const activeEvents = await db
+    .collection<EventModel>('events')
+    .find({ status: { $ne: EventStatus.ARCHIVED } })
+    .toArray();
+
+  const allUsers = await db
+    .collection('users')
+    .find({}, { projection: { _id: 1 } })
+    .toArray();
+  const allUserIds = allUsers.map((u) => u._id);
+
+  for (const { _id: eventId, nomDateTime, categories } of activeEvents) {
+    // take each user's most recent predictionset for this event
+    const predictionSetRequests = [];
+    for (const userId of allUserIds) {
+      const predictionSetRequest = db
+        .collection<PredictionSet>('predictionsets')
+        .findOne({ userId, eventId }, { sort: { yyyymmdd: -1 } });
+      predictionSetRequests.push(predictionSetRequest);
+    }
+    // execute all requests in parallel
+    const predictionSets = await Promise.all(predictionSetRequests);
+
+    // tally up the current community rankings
+    const contenderInfo: {
+      [contenderId: string]: {
+        movieId: ObjectId;
+        personId?: ObjectId;
+        songId?: ObjectId;
+      };
+    } = {};
+    const numPredicting: {
+      [categoryName: string]: {
+        [contenderId: string]: { [ranking: number]: number };
+      };
+    } = {};
+    for (const predictionSet of predictionSets) {
+      if (!predictionSet) {
+        continue;
+      }
+      const { categories } = predictionSet;
+      for (const [categoryName, categoryPrediction] of Object.entries(
+        categories
+      )) {
+        const { createdAt, predictions } = categoryPrediction;
+        // don't record a prediction that's over 30 days old
+        if (createdAt < thirtyDaysAgo) {
+          continue;
+        }
+        // this is where the next-day phase exception rule would go
+        for (const prediction of predictions) {
+          const { contenderId: contenderObjectId, ranking } = prediction;
+          const contenderId = contenderObjectId.toString();
+          if (!numPredicting[categoryName]) {
+            numPredicting[categoryName] = {};
+          }
+          if (!numPredicting[categoryName][contenderId]) {
+            // first time we encounter the contenderId, fill in this info
+            contenderInfo[contenderId] = {
+              movieId: prediction.movieId,
+              personId: prediction.personId,
+              songId: prediction.songId
+            };
+            numPredicting[categoryName][contenderId] = {};
+          }
+          if (!numPredicting[categoryName][contenderId][ranking]) {
+            numPredicting[categoryName][contenderId][ranking] = 0;
+          }
+          numPredicting[categoryName][contenderId][ranking] += 1;
+        }
+      }
+    }
+
+    // this helps us get the actual list ranking for each contender
+    const pointsPerContenderId: { [contenderId: string]: number } = {};
+    for (const categoryName of Object.keys(categories)) {
+      for (const [contenderId, rankings] of Object.entries(
+        numPredicting[categoryName]
+      )) {
+        pointsPerContenderId[contenderId] = getContenderPoints(rankings);
+      }
+    }
+    const sortedContenderIds = Object.entries(pointsPerContenderId)
+      .sort(([, a], [, b]) => {
+        // this will sort so the largest number comes first in the list
+        if (a > b) return -1;
+        if (a < b) return 1;
+        return 0;
+      })
+      .map(([contenderId]) => contenderId);
+
+    // format the "categories" field on PredictionSet
+    const categoryPredictions: {
+      [key: string]: iCategoryPrediction;
+    } = {};
+    for (const [categoryName, { type, phase }] of Object.entries(categories)) {
+      // we need numPredicting amount of predictions for each category
+      const predictions: iPredictions = [];
+      for (const [contenderId, rankings] of Object.entries(
+        numPredicting[categoryName]
+      )) {
+        // get the actual list ranking
+        const ranking = sortedContenderIds.indexOf(contenderId) + 1;
+        predictions.push({
+          ...contenderInfo[contenderId], // contains movieId, personId, songId
+          contenderId: new ObjectId(contenderId),
+          ranking,
+          numPredicting: rankings
+        });
+      }
+      categoryPredictions[categoryName] = {
+        type,
+        phase,
+        createdAt: new Date(),
+        predictions
+      };
+    }
+
+    // if any shortlist is happening today, we need to know so we can write to tomorrow's predictions
+    // see POST:predictionset for why
+    const maybeShortlistDateTimeHappeningToday = Object.values(categories)
+      .map((c) => c.shortlistDateTime)
+      .find(
+        (shortlistDateTime) =>
+          shortlistDateTime && yyyymmdd === dateToYyyymmdd(shortlistDateTime)
+      );
+
+    // this is for writing to
+    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
+      nomDateTime,
+      maybeShortlistDateTimeHappeningToday
+    )
+      ? tomorrowYyyymmdd
+      : todayYyyymmdd;
+
+    // get most recent
+    const mostRecentPredictionSet = await db
+      .collection<PredictionSet>('predictionsets')
+      .findOne(
+        { userId: COMMUNITY_USER_ID, eventId: new ObjectId(eventId) },
+        { sort: { yyyymmdd: -1 } }
+      );
+
+    const isNewDate =
+      mostRecentPredictionSet && yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
+
+    // create predictionset this is the first for the event, or we don't have one for this date yet
+    if (!mostRecentPredictionSet || isNewDate) {
+      await db.collection<PredictionSet>('predictionsets').insertOne({
+        userId: COMMUNITY_USER_ID,
+        eventId: new ObjectId(eventId),
+        yyyymmdd,
+        // @ts-expect-error - This should only have partial data
+        categories: categoryPredictions
+      });
+      // else if predictionset exists for event, update it
+    } else {
+      // update the current prediction set
+      await db.collection<PredictionSet>('predictionsets').updateOne(
+        // @ts-expect-error - this particular ID is a string
+        { _id: COMMUNITY_USER_ID },
+        {
+          $set: {
+            categories: categoryPredictions
+          }
+        }
+      );
+    }
+  }
 
   return {
     statusCode: 200
   };
 });
-
-// Weird: If I want to see the predictions for a single movie,
-// I'm going to have to reference the community predictions and parse through them, to access the numPredicting property, which kind of sucks
-// What if, instead, I just have numPredicting live on the Contender, and update all the contenders as well? That would make it much easier to access
-// It's just making it exist in 2 separate places, but it's only updating through the same mechanism so it will always be the same
-// I think this is probably worth doing
-// but maybe it's not -- the user community object is going to be huge, but we're going to load it anyway right?
-// idk.
-// Cause if I think about history, I'm going to have to use the community predictions anyway right?
-// I'd get my history prediction, then the community history prediction, and display them side by side for the same category
-
-// What is even the point of having contenderId? I guess it's to prevent duplicates. Yeah that makes sense. We more refer to it as a source of uniqueness.
-
-// What about getting up-to-date movie info?
-// We don't have this solved for regular user prediction sets either
-// 1.
-// - One option is to read from each movie as the prediction is updated
-// - which is like 20 reads per category change, not the worst thing
-// - and for community, it would be like 1000 reads, one per contender
-// - we'd use the tmdbId to query the Movie table, to get the up-to-date info
-// - for songs, we'd want to query with the songId actually, since we don't have a tmdbId
-// - because a song could have the title updated
-// 2. (!!!) I THINK I'M GONNA DO THIS
-// - It's worth considering filling in the movie info when we load up the app
-// - because even though it's a batch get request to do it, it will be cached
-// - and the pro is that there aren't multiple versions of movie posters
-// - because otherwise stale data combines with fresh data and it's sort of a mess
-// - the con is that initial load times are slower since they have to not only fetch a predictionset say,
-// - but also all the movies in the prediction sets, assembling them from either the database or the async storgae cache
-// - it's also better than in the app right now because we can fetch this data from the database,
-// - not from tmdb, which is a lot faster,
-// - since we have the updateTmdb cron func running to do that for us
-
-// What about getting up to date movie posters and such for history?
-// (SOLVED WITH #2)
-// I don't know, maybe that's a problem for another time
-
-// What about special movie data for certain contenders, like directing contenders?
-// Also solved with #2 - match it on the frontend not the backend
