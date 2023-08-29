@@ -15,7 +15,7 @@ import {
 } from './types/models';
 import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
-import { dateToYyyymmdd } from './helper/utils';
+import { dateToYyyymmdd, getDate } from './helper/utils';
 import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
 
@@ -127,10 +127,8 @@ export const post = dbWrapper<
     }
 
     // get today and tomorrow's yyyymmdd
-    const d = new Date();
-    const todayYyyymmdd = dateToYyyymmdd(d);
-    d.setDate(d.getDate() + 1); // increment to tomorrow
-    const tomorrowYyyymmdd = dateToYyyymmdd(d);
+    const todayYyyymmdd = dateToYyyymmdd(getDate());
+    const tomorrowYyyymmdd = dateToYyyymmdd(getDate(1));
 
     // determine whether we need to write to today or tomorrow to preserve final predictions
     // predictions post-nom/shortlist on the day of transition will count towards the next day

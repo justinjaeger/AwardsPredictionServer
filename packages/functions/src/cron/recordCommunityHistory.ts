@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { COMMUNITY_USER_ID } from 'src/helper/constants';
 import { getContenderPoints } from 'src/helper/getContenderPoints';
 import { shouldLogPredictionsAsTomorrow } from 'src/helper/shouldLogPredictionsAsTomorrow';
-import { dateToYyyymmdd } from 'src/helper/utils';
+import { dateToYyyymmdd, getDate } from 'src/helper/utils';
 import { dbWrapper } from 'src/helper/wrapper';
 import { EventStatus } from 'src/types/enums';
 import {
@@ -15,12 +15,9 @@ import {
 
 export const handler = dbWrapper(async ({ db }) => {
   // Calculate numPredicting by querying user predictionsets with yyyymmdd that is <30 days ago
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const todayYyyymmdd = dateToYyyymmdd(new Date());
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  const tomorrowYyyymmdd = dateToYyyymmdd(d);
+  const thirtyDaysAgo = getDate(30);
+  const todayYyyymmdd = dateToYyyymmdd(getDate());
+  const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
 
   // get list of events that are not archived, we'll query only those prediction sets
   const activeEvents = await db
