@@ -41,5 +41,10 @@ export const SERVER_ERROR: Record<string, ErrorResponse> = {
     statusCode: 403,
     error: 'RevokeAccess',
     message: 'Bad refresh token'
+  },
+  Error: {
+    statusCode: 500,
+    error: 'Error',
+    message: 'An error occurred'
   }
 };

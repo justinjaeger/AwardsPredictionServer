@@ -257,18 +257,40 @@ export const post = dbWrapper<
         { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
         { upsert: true, session } // useful the first time a user updates a category
       );
+    // useful if you don't want the calendar to be filled by category but the event overall
+    const eventUpdateLogsRequest = db
+      .collection<CategoryUpdateLog>('categoryupdatelogs')
+      .updateOne(
+        {
+          userId: new ObjectId(userId),
+          eventId: new ObjectId(eventId)
+        },
+        { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
+        { upsert: true, session } // useful the first time a user updates a category
+      );
 
-    // atomically execute all three requests
+    // atomically execute all requests
     // Important:: You must pass the session to all requests!!
     try {
-      await session.withTransaction(async () => {
-        await predictionSetRequest;
-        await userRequest;
-        await categoryUpdateLogsRequest;
-      });
+      session.startTransaction();
+      const res = await Promise.allSettled([
+        predictionSetRequest,
+        userRequest,
+        categoryUpdateLogsRequest,
+        eventUpdateLogsRequest
+      ]);
+      if (res.some(({ status }) => status === 'rejected')) {
+        throw new Error();
+      }
+      await session.commitTransaction();
+    } catch {
+      await session.abortTransaction();
+      return {
+        ...SERVER_ERROR.Error,
+        message: `Error updating predictionset`
+      };
     } finally {
       await session.endSession();
-      await client.close();
     }
 
     return {
