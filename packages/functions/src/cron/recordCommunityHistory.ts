@@ -13,8 +13,11 @@ import {
   type iPredictions
 } from 'src/types/models';
 
+/**
+ * Records community predictions every hour
+ * Creates a new log on each unique day
+ */
 export const handler = dbWrapper(async ({ db }) => {
-  // Calculate numPredicting by querying user predictionsets with yyyymmdd that is <30 days ago
   const thirtyDaysAgo = getDate(30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
   const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
@@ -31,19 +34,24 @@ export const handler = dbWrapper(async ({ db }) => {
     .toArray();
   const allUserIds = allUsers.map((u) => u._id);
 
+  // for each active event, take each user's most recent predictionset
   for (const { _id: eventId, nomDateTime, categories } of activeEvents) {
-    // take each user's most recent predictionset for this event
-    const predictionSetRequests = [];
-    for (const userId of allUserIds) {
-      const predictionSetRequest = db
-        .collection<PredictionSet>('predictionsets')
-        .findOne({ userId, eventId }, { sort: { yyyymmdd: -1 } });
-      predictionSetRequests.push(predictionSetRequest);
-    }
+    const predictionSetRequests = allUserIds.map(
+      (userId) =>
+        db
+          .collection<PredictionSet>('predictionsets')
+          .findOne({ userId, eventId }, { sort: { yyyymmdd: -1 } }) // returns largest (most recent) first
+    );
     // execute all requests in parallel
     const predictionSets = await Promise.all(predictionSetRequests);
 
     // tally up the current community rankings
+    const numPredicting: {
+      [categoryName: string]: {
+        [contenderId: string]: { [ranking: number]: number };
+      };
+    } = {};
+    // also get contender info to link to contenderId... this is needed to display the community prediction
     const contenderInfo: {
       [contenderId: string]: {
         movieId: ObjectId;
@@ -51,27 +59,21 @@ export const handler = dbWrapper(async ({ db }) => {
         songId?: ObjectId;
       };
     } = {};
-    const numPredicting: {
-      [categoryName: string]: {
-        [contenderId: string]: { [ranking: number]: number };
-      };
-    } = {};
     for (const predictionSet of predictionSets) {
-      if (!predictionSet) {
-        continue;
-      }
-      const { categories } = predictionSet;
+      if (!predictionSet) continue;
       for (const [categoryName, categoryPrediction] of Object.entries(
-        categories
+        predictionSet.categories
       )) {
         const { createdAt, predictions } = categoryPrediction;
         // don't record a prediction that's over 30 days old
-        if (createdAt < thirtyDaysAgo) {
-          continue;
-        }
-        // this is where the next-day phase exception rule would go
-        for (const prediction of predictions) {
-          const { contenderId: contenderObjectId, ranking } = prediction;
+        if (createdAt < thirtyDaysAgo) continue;
+        for (const {
+          movieId,
+          personId,
+          songId,
+          contenderId: contenderObjectId,
+          ranking
+        } of predictions) {
           const contenderId = contenderObjectId.toString();
           if (!numPredicting[categoryName]) {
             numPredicting[categoryName] = {};
@@ -79,9 +81,9 @@ export const handler = dbWrapper(async ({ db }) => {
           if (!numPredicting[categoryName][contenderId]) {
             // first time we encounter the contenderId, fill in this info
             contenderInfo[contenderId] = {
-              movieId: prediction.movieId,
-              personId: prediction.personId,
-              songId: prediction.songId
+              movieId,
+              personId,
+              songId
             };
             numPredicting[categoryName][contenderId] = {};
           }
@@ -93,7 +95,7 @@ export const handler = dbWrapper(async ({ db }) => {
       }
     }
 
-    // this helps us get the actual list ranking for each contender
+    // tally up points for each contenderId. this is used to sort the contenders
     const pointsPerContenderId: { [contenderId: string]: number } = {};
     for (const categoryName of Object.keys(categories)) {
       for (const [contenderId, rankings] of Object.entries(
@@ -113,7 +115,7 @@ export const handler = dbWrapper(async ({ db }) => {
 
     // format the "categories" field on PredictionSet
     const categoryPredictions: {
-      [key: string]: iCategoryPrediction;
+      [categoryName: string]: iCategoryPrediction;
     } = {};
     for (const [categoryName, { type, phase }] of Object.entries(categories)) {
       // we need numPredicting amount of predictions for each category
@@ -147,7 +149,7 @@ export const handler = dbWrapper(async ({ db }) => {
           shortlistDateTime && yyyymmdd === dateToYyyymmdd(shortlistDateTime)
       );
 
-    // this is for writing to
+    // get the day we should log this predictionset as
     const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
       nomDateTime,
       maybeShortlistDateTimeHappeningToday
@@ -166,7 +168,7 @@ export const handler = dbWrapper(async ({ db }) => {
     const isNewDate =
       mostRecentPredictionSet && yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
 
-    // create predictionset this is the first for the event, or we don't have one for this date yet
+    // create predictionset this is the first for the event, or the first on this date
     if (!mostRecentPredictionSet || isNewDate) {
       await db.collection<PredictionSet>('predictionsets').insertOne({
         userId: COMMUNITY_USER_ID,
