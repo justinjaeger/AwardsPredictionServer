@@ -16,7 +16,10 @@ import {
 import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
 import { dateToYyyymmdd, getDate } from './helper/utils';
-import { RECENT_PREDICTION_SETS_TO_SHOW } from './helper/constants';
+import {
+  COMMUNITY_USER_ID,
+  RECENT_PREDICTION_SETS_TO_SHOW
+} from './helper/constants';
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
 
 /**
@@ -36,7 +39,8 @@ export const get = dbWrapper<
   }) => {
     const yyyymmdd = yyyymmddString ? parseInt(yyyymmddString) : undefined;
     const filter: Filter<PredictionSet> = {
-      userId: new ObjectId(userId),
+      userId:
+        userId === COMMUNITY_USER_ID ? COMMUNITY_USER_ID : new ObjectId(userId),
       eventId: new ObjectId(eventId)
     };
     const options: FindOptions<PredictionSet> = {};
