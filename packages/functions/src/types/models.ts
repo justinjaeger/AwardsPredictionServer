@@ -21,7 +21,7 @@ export interface CategoryUpdateLog {
   userId: ObjectId;
   eventId: ObjectId;
   category: CategoryName;
-  yyyymmddUpdates: Record<string, boolean>;
+  yyyymmddUpdates: Record<number, boolean>;
 }
 
 export interface Contender {

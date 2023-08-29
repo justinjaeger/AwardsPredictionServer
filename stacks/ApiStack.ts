@@ -42,6 +42,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /tokens": `${PATH}/token.get`, // uses payload from refreshToken
       "GET /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
+      "GET /categoryupdatelogs": `${PATH}/categoryupdatelogs.get`,
       "GET /jwt": `${PATH}/jwt.get`,
       // (fake post requests)
       "POST /movies": `${PATH}/movie.getBatch`,
