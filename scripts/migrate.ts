@@ -10,10 +10,11 @@ const {
     AmplifySong, 
     AmplifyUser,
 } = require("./types/amplifyApi");
+const { MongoUser, MongoToken } = require("./types/mongoApi");
 
 const dotenv = require('dotenv');
 dotenv.config();
-const { ObjectId } = require("mongodb");
+// const { ObjectId } = require("mongodb");
 const { ScanCommand } = require("@aws-sdk/client-dynamodb");
 // @ts-ignore
 const connectDynamoDB = require("./helpers/connectDynamoDB.ts");
@@ -72,6 +73,10 @@ const connectMongoDB = require("./helpers/connectMongoDB.ts");
  * - I'm def gonna need to elimnate them during this migration,
  * - but what I actually should do is run the deletion scripts first, then run this
  * - if a duplicate comes up, Mongodb unique indexes should catch it, then we can go and run that amplify script
+ * 
+ * What about IMAGES??
+ * - I actually don't know. People might just have to upload new images. And I need a new service
+ * - Or we could just use aws still and do it the manual way
  */
 
 const userTable = "User-jrjijr2sgbhldoizdkwwstdpn4-prod"
@@ -105,6 +110,22 @@ async function handler() {
                 return Object.fromEntries(itemEntries);
             }) as AmplifyModel[];
     }
+
+    const convertUser = (user: AmplifyUser): MongoUser => {
+        return {
+            email: user.email,
+            name: user.name,
+            username: user.username,
+            role: user.role,
+            image: user.image,
+            bio: user.bio,
+            amplify_id: user.id,
+            // TODO: followingCount
+            // TODO: followerCount
+            // TODO: recentPredictions
+            // TODO: eventsPredicting (arr of object ids)
+        }
+    }
     
     // get all dynamodb items
     const userItems = await getTableItems<AmplifyUser>(userTable)
@@ -117,7 +138,15 @@ async function handler() {
     const songItems = await getTableItems<AmplifySong>(songTable)
     const predictionItems = await getTableItems<AmplifyPrediction>(predictionTable)
     const predictionSetItems = await getTableItems<AmplifyPredictionSet>(predictionSetTable)
-    console.log(contenderItems[0])
+
+    console.log(convertUser(userItems[0]))
+    // userItems.forEach((user)=> {
+    //     mongodb.collection('users').updateOne(
+    //         { aws_id: user.id },
+    //         { $set: user },
+    //         { upsert: true }
+    //     )
+    // });
 
     // const users = mongodb.collection<User>("users");
     // const result = await users.find({}).toArray();
