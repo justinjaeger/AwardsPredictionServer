@@ -1,4 +1,4 @@
-import { type Db } from 'mongodb';
+import { type MongoClient, type Db } from 'mongodb';
 import connect from './connect';
 import { type APIGatewayProxyEvent, type Context } from 'aws-lambda';
 import { type ApiResponse } from '../types/responses';
@@ -17,9 +17,10 @@ export function dbWrapper<Req = {}, Res = {}>(
     event: APIGatewayProxyEvent;
     context: Context;
     db: Db;
+    client: MongoClient;
     authenticatedUserId: string | undefined; // returns string if user is authenticated
     payload: Req;
-    params: Record<string, any | undefined>;
+    params: Record<string, string | undefined>;
   }) => Promise<ApiResponse<Res>>
 ) {
   return async (event: APIGatewayProxyEvent, context: Context) => {
@@ -27,9 +28,9 @@ export function dbWrapper<Req = {}, Res = {}>(
     context.callbackWaitsForEmptyEventLoop = false; // false sends the response right away when the callback runs, instead of waiting for the Node.js event loop to be empty. If this is false, any outstanding events continue to run during the next invocation.
     const payload = event.body ? JSON.parse(event.body) : {};
     // connect to mongodb
-    const db = await connect();
-    // decode userId from jwt
-    const accessToken = event?.headers?.Authorization?.split(' ')[1];
+    const { db, client } = connect();
+    // decode userId from jwt (header looks like "Authorization: Bearer <token>")
+    const accessToken = event?.headers?.Authorization?.split(' ')[2];
     let authenticatedUserId: string | undefined;
     if (accessToken) {
       try {
@@ -56,6 +57,7 @@ export function dbWrapper<Req = {}, Res = {}>(
       event,
       context,
       db,
+      client,
       authenticatedUserId,
       payload,
       params

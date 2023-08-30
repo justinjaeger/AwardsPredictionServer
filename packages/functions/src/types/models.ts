@@ -21,18 +21,18 @@ export interface CategoryUpdateLog {
   userId: ObjectId;
   eventId: ObjectId;
   category: CategoryName;
-  yyyymmddUpdates: Record<string, boolean>;
+  yyyymmddUpdates: Record<number, boolean>;
 }
 
 export interface Contender {
   eventId: ObjectId;
   movieId: ObjectId;
-  visible: boolean;
   category: CategoryName;
-  numPredicting: Record<string, number>;
+  isHidden?: boolean;
   accolade?: Phase;
   songId?: ObjectId;
   personId?: ObjectId;
+  numPredicting?: Record<number, number>;
 }
 
 export interface EventModel {
@@ -52,23 +52,27 @@ export interface EventModel {
   winDateTime?: Date;
 }
 
+export type IMovieCategoryCredit =
+  | 'directing'
+  | 'screenplay'
+  | 'cinematography'
+  | 'costumes'
+  | 'editing'
+  | 'productionDesign'
+  | 'score'
+  | 'vfx';
+
 export interface Movie {
   tmdbId: number;
   title: string;
+  year?: number;
   studio?: string;
   plot?: string;
+  imdbId?: string;
   cast?: string;
   posterPath?: string;
-  categoryInfo: {
-    director?: string;
-    screenplay?: string;
-    cinematography?: string;
-    costumes?: string;
-    editing?: string;
-    productionDesign?: string;
-    score?: string;
-    visualEffects?: string;
-  };
+  backdropPath?: string;
+  categoryCredits: Record<IMovieCategoryCredit, string[]>;
 }
 
 export interface Person {
@@ -78,35 +82,29 @@ export interface Person {
   posterPath?: string;
 }
 
+export type iPredictions = Array<{
+  contenderId: ObjectId;
+  ranking: number;
+  movieId: ObjectId;
+  personId?: ObjectId;
+  songId?: ObjectId;
+  numPredicting?: Record<number, number>; // only applies to community predictions
+}>;
+
+export type iCategoryPrediction = {
+  type: CategoryType;
+  createdAt: Date;
+  predictions: iPredictions;
+  phase?: Phase | undefined;
+};
+
 export interface PredictionSet {
-  userId: ObjectId;
+  userId: ObjectId | 'community';
   eventId: ObjectId;
   yyyymmdd: number;
-  categories: Record<
-    CategoryName,
-    {
-      type: CategoryType;
-      phase?: Phase;
-      predictions: Array<{
-        contenderId: ObjectId;
-        ranking: number;
-        movie: {
-          tmdbId: number;
-          title: string;
-          posterPath?: string;
-        };
-        person?: {
-          tmdbId: number;
-          name: string;
-          posterPath?: string;
-        };
-        song?: {
-          title: string;
-          artist?: string;
-        };
-      }>;
-    }
-  >;
+  categories: {
+    [key in CategoryName]: iCategoryPrediction;
+  };
 }
 
 export interface Relationship {
@@ -140,32 +138,12 @@ export interface User {
   followingCount?: number;
   followerCount?: number;
   eventsPredicting?: ObjectId[];
-  recentPredictionSets?: [
-    {
-      awardsBody: string;
-      category: string;
-      year: string;
-      predictionSetId: ObjectId;
-      createdAt: Date;
-      topPredictions: [
-        {
-          ranking: number;
-          movie: {
-            tmdbId: number;
-            title: string;
-            posterPath: string;
-          };
-          person?: {
-            tmdbId: number;
-            name: string;
-            profilePath: string;
-          };
-          song?: {
-            title: string;
-            artist?: string;
-          };
-        }
-      ];
-    }
-  ];
+  recentPredictionSets?: Array<{
+    awardsBody: string;
+    category: string;
+    year: number;
+    predictionSetId: ObjectId;
+    createdAt: Date;
+    topPredictions: iPredictions;
+  }>;
 }

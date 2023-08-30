@@ -1,6 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config();
-import { MongoClient, ServerApiVersion } from 'mongodb';
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const MONGODB_URI = `mongodb+srv://justinjaeger:${encodeURIComponent(process.env.MONGODB_PASSWORD || '')}@serverlessinstance0.0omknww.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -18,4 +16,4 @@ const connectToDatabase = async () =>{
   return mongoDb;
 }
 
-export default connectToDatabase;
+module.exports = connectToDatabase;

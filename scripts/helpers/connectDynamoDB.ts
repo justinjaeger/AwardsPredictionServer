@@ -1,10 +1,10 @@
-import {DynamoDB} from "@aws-sdk/client-dynamodb";
+const { DynamoDB } = require("@aws-sdk/client-dynamodb");
 
 /**
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/clients/client-dynamodb/
  */
 
-const connectDynamoDB = async () =>{
+const connect = async () => {
     const REGION = "us-east-1";
     const dynamoDBClient = new DynamoDB({
         region: REGION, 
@@ -16,4 +16,4 @@ const connectDynamoDB = async () =>{
     return dynamoDBClient;
 }
 
-export default connectDynamoDB;
+module.exports = connect;

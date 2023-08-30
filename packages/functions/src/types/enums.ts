@@ -1,4 +1,5 @@
 export enum Phase {
+  CLOSED = 'CLOSED',
   SHORTLIST = 'SHORTLIST',
   NOMINATION = 'NOMINATION',
   WINNER = 'WINNER'

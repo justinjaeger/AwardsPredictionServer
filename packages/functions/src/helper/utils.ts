@@ -14,3 +14,15 @@ export const getAggregatePagination = (
   pageNumber: number = 1,
   limit: number = DEFAULT_PAGINATE_LIMIT
 ): Document[] => [{ $skip: (pageNumber - 1) * limit }, { $limit: limit }];
+
+export const dateToYyyymmdd = (date: Date) => {
+  return parseInt(`${date.getFullYear()}${date.getMonth()}${date.getDate()}`);
+};
+
+export const getDate = (daysFromToday?: number) => {
+  const d = new Date();
+  if (daysFromToday) {
+    d.setDate(d.getDate() + daysFromToday);
+  }
+  return d;
+};
