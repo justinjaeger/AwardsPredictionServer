@@ -1,10 +1,10 @@
-enum AmplifyUserRole {
+export enum AmplifyUserRole {
   ADMIN = "ADMIN",
   TESTER = "TESTER",
   USER = "USER",
 }
 
-type AmplifyUser = {
+export type AmplifyUser = {
   __typename: "User",
   id: string,
   email: string,
@@ -18,7 +18,7 @@ type AmplifyUser = {
   updatedAt: string,
 };
 
-type AmplifyPredictionSet = {
+export type AmplifyPredictionSet = {
   __typename: "PredictionSet",
   id: string,
   userId: string,
@@ -33,7 +33,7 @@ type AmplifyPredictionSet = {
   updatedAt: string,
 };
 
-type AmplifyEvent = {
+export type AmplifyEvent = {
   __typename: "Event",
   id: string,
   categories?: null,
@@ -49,7 +49,7 @@ type AmplifyEvent = {
   updatedAt: string,
 };
 
-type AmplifyCategory = {
+export type AmplifyCategory = {
   __typename: "Category",
   id: string,
   eventId: string,
@@ -64,7 +64,7 @@ type AmplifyCategory = {
   updatedAt: string,
 };
 
-enum AmplifyCategoryName {
+export enum AmplifyCategoryName {
   PICTURE = "PICTURE",
   DIRECTOR = "DIRECTOR",
   ACTOR = "ACTOR",
@@ -109,20 +109,20 @@ enum AmplifyCategoryName {
 }
 
 
-enum AmplifyCategoryType {
+export enum AmplifyCategoryType {
   FILM = "FILM",
   PERFORMANCE = "PERFORMANCE",
   SONG = "SONG",
 }
 
 
-enum AmplifyContenderAccolade {
+export enum AmplifyContenderAccolade {
   WINNER = "WINNER",
   NOMINEE = "NOMINEE",
   SHORTLISTED = "SHORTLISTED",
 }
 
-type AmplifyHistoryPredictionSet = {
+export type AmplifyHistoryPredictionSet = {
   __typename: "HistoryPredictionSet",
   id: string,
   userId: string,
@@ -138,7 +138,7 @@ type AmplifyHistoryPredictionSet = {
   updatedAt: string,
 };
 
-type AmplifyHistoryPrediction = {
+export type AmplifyHistoryPrediction = {
   __typename: "HistoryPrediction",
   id: string,
   historyPredictionSetId: string,
@@ -151,7 +151,7 @@ type AmplifyHistoryPrediction = {
   updatedAt: string,
 };
 
-type AmplifyContender = {
+export type AmplifyContender = {
   __typename: "Contender",
   id: string,
   categoryId: string,
@@ -170,7 +170,7 @@ type AmplifyContender = {
   updatedAt: string,
 };
 
-type AmplifyMovie = {
+export type AmplifyMovie = {
   __typename: "Movie",
   id: string,
   tmdbId: number,
@@ -179,7 +179,7 @@ type AmplifyMovie = {
   updatedAt: string,
 };
 
-type AmplifyPerson = {
+export type AmplifyPerson = {
   __typename: "Person",
   id: string,
   tmdbId: number,
@@ -187,7 +187,7 @@ type AmplifyPerson = {
   updatedAt: string,
 };
 
-type AmplifySong = {
+export type AmplifySong = {
   __typename: "Song",
   id: string,
   movieId: string,
@@ -198,19 +198,19 @@ type AmplifySong = {
   updatedAt: string,
 };
 
-enum AmplifyContenderVisibility {
+export enum AmplifyContenderVisibility {
   HIDDEN = "HIDDEN",
   VISIBLE = "VISIBLE",
 }
 
 
-enum AmplifyPredictionType {
+export enum AmplifyPredictionType {
   WIN = "WIN",
   NOMINATION = "NOMINATION",
 }
 
 
-enum AmplifyAwardsBody {
+export enum AmplifyAwardsBody {
   ACADEMY_AWARDS = "ACADEMY_AWARDS",
   GOLDEN_GLOBES = "GOLDEN_GLOBES",
   CRITICS_CHOICE = "CRITICS_CHOICE",
@@ -228,7 +228,7 @@ enum AmplifyAwardsBody {
 }
 
 
-enum AmplifyEventStatus {
+export enum AmplifyEventStatus {
   NOMS_STAGING = "NOMS_STAGING",
   NOMS_LIVE = "NOMS_LIVE",
   WINS_STAGING = "WINS_STAGING",
@@ -236,7 +236,7 @@ enum AmplifyEventStatus {
   ARCHIVED = "ARCHIVED",
 }
 
-type AmplifyPrediction = {
+export type AmplifyPrediction = {
   __typename: "Prediction",
   id: string,
   predictionSetId: string,
@@ -247,7 +247,7 @@ type AmplifyPrediction = {
   updatedAt: string,
 };
 
-type AmplifyRelationship = {
+export type AmplifyRelationship = {
   __typename: "Relationship",
   id: string,
   followedUserId: string,

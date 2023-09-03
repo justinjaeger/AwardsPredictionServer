@@ -1,4 +1,6 @@
-const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+import dotenv from 'dotenv';
+dotenv.config();
+import { DynamoDB } from "@aws-sdk/client-dynamodb";
 
 /**
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/clients/client-dynamodb/
@@ -16,4 +18,4 @@ const connect = async () => {
     return dynamoDBClient;
 }
 
-module.exports = connect;
+export default connect;

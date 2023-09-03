@@ -1,9 +1,14 @@
 {
-    "compilerOptions": {
-      "esModuleInterop": true,
-      "moduleResolution": "nodenext",
-      "allowImportingTsExtensions": true,
-      "module": "es6",
-      "target": "es5",   
-    }
+  "extends": "@tsconfig/node16/tsconfig.json",
+  "include": ["*"],
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+        "@rest-api-mongodb/core/*": ["../core/src/*"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
 }

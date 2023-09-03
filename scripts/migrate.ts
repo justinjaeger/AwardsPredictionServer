@@ -1,7 +1,9 @@
-//@ts-nocheck
-const { 
+import { ObjectId } from "mongodb";
+import { ScanCommand } from "@aws-sdk/client-dynamodb";
+import { 
     AmplifyCategory, 
     AmplifyContender, 
+    AmplifyEvent, 
     AmplifyMovie, 
     AmplifyPerson, 
     AmplifyPrediction, 
@@ -9,16 +11,11 @@ const {
     AmplifyRelationship, 
     AmplifySong, 
     AmplifyUser,
-} = require("./types/amplifyApi");
-const { MongoUser, MongoToken } = require("./types/mongoApi");
-
-const dotenv = require('dotenv');
-dotenv.config();
-// const { ObjectId } = require("mongodb");
-const { ScanCommand } = require("@aws-sdk/client-dynamodb");
-// @ts-ignore
-const connectDynamoDB = require("./helpers/connectDynamoDB.ts");
-const connectMongoDB = require("./helpers/connectMongoDB.ts");
+} from "./types/amplifyApi.ts";
+import connectDynamoDB from "./helpers/connectDynamoDB.ts";
+import connectMongoDB from "./helpers/connectMongoDB.ts";
+import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
+import { CategoryName, CategoryType, MongoContender, MongoEventModel, MongoMovie, MongoPerson, MongoPredictionSet, MongoRelationship, MongoSong, MongoUser, iMongoCategories, iRecentPredictions } from "types/mongoApi.ts";
 
 /**
  * Documentation, all dynamodb commands:
@@ -90,18 +87,52 @@ const songTable = 'Song-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionTable = 'Prediction-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionSetTable = 'PredictionSet-jrjijr2sgbhldoizdkwwstdpn4-prod'
 
+// Id is going to be in a different place depending on if it updated or created
+const getResId = (res:any): ObjectId => res.value?._id || res.lastErrorObject?.upserted;
+
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////TODO:///////////
+/////////////////////
+//////////Delete all current indexes in compass, but keep track of them.///////////
+//////////Re-create all indexes in the mongosh shell.//////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
+/////////////////////
 async function handler() {
     const dynamodb = await connectDynamoDB();
     const mongodb = await connectMongoDB();
 
-    const getTableItems = async <AmplifyModel>(tableName: string) =>{
+    // mognodb test:
+    // const a = await mongodb.collection('relationships').indexes();
+    // console.log('done:', a)
+
+    const getTableItems = async <AmplifyModel>(tableName: string) => {
+        //@ts-ignore
         return (await dynamodb.send((new ScanCommand({ TableName: tableName })))).Items
             .map((item)=>{
                 const itemKeys = Object.keys(item);
                 const itemValues = Object.values(item);
                 const itemEntries = itemKeys.map((key, index)=>{
                     const val = itemValues[index];
+                    //@ts-ignore
                     const str = val.S;
+                    //@ts-ignore
                     const number = Number(val.N);
                     if (str === 'TRUE') return [key, true];
                     if (str === 'FALSE') return [key, false];
@@ -110,57 +141,224 @@ async function handler() {
                 return Object.fromEntries(itemEntries);
             }) as AmplifyModel[];
     }
-
-    const convertUser = (user: AmplifyUser): MongoUser => {
-        return {
-            email: user.email,
-            name: user.name,
-            username: user.username,
-            role: user.role,
-            image: user.image,
-            bio: user.bio,
-            amplify_id: user.id,
-            // TODO: followingCount
-            // TODO: followerCount
-            // TODO: recentPredictions
-            // TODO: eventsPredicting (arr of object ids)
-        }
-    }
     
     // get all dynamodb items
     const userItems = await getTableItems<AmplifyUser>(userTable)
     const relationshipItems = await getTableItems<AmplifyRelationship>(relationshipTable)
-    const eventItems = await getTableItems<AmplifyUser>(eventTable)
     const categoryItems = await getTableItems<AmplifyCategory>(categoryTable)
-    const contenderItems = await getTableItems<AmplifyContender>(contenderTable)
+    const eventItems = await getTableItems<AmplifyEvent>(eventTable)
     const movieItems = await getTableItems<AmplifyMovie>(movieTable)
     const personItems = await getTableItems<AmplifyPerson>(personTable)
     const songItems = await getTableItems<AmplifySong>(songTable)
+    const contenderItems = await getTableItems<AmplifyContender>(contenderTable)
     const predictionItems = await getTableItems<AmplifyPrediction>(predictionTable)
     const predictionSetItems = await getTableItems<AmplifyPredictionSet>(predictionSetTable)
 
-    console.log(convertUser(userItems[0]))
-    // userItems.forEach((user)=> {
-    //     mongodb.collection('users').updateOne(
-    //         { aws_id: user.id },
-    //         { $set: user },
+    // CATEGORIES
+    const amplifyEventIdToMongoCategories: {[amplifyEventId: string]: iMongoCategories} = {};
+    const amplifyCategoryIdToCategory: {[amplifyCategoryId: string]: { type: CategoryType, name: CategoryName }} = {};
+    for (const amplifyCategory of categoryItems) {
+        if (!amplifyEventIdToMongoCategories[amplifyCategory.eventId]) {
+            //@ts-ignore - allow categories to be partially filled out
+            amplifyEventIdToMongoCategories[amplifyCategory.eventId] = {}
+        }const type = amplifyCategoryTypeToMongoCategoryType(amplifyCategory.type);
+        amplifyEventIdToMongoCategories[amplifyCategory.eventId][amplifyCategory.name] = {
+            type,
+        };
+        amplifyCategoryIdToCategory[amplifyCategory.id] = {
+            type,
+            name: amplifyCategoryNameToMongoCategoryName(amplifyCategory.name),
+        };
+    }
+
+    console.log('amplifyEventIdToMongoCategories',amplifyEventIdToMongoCategories)
+
+    const amplifyEventIdToMongoEventId: {[amplifyEventId: string]: ObjectId} = {};
+    const amplifyEventIdToMongoEvent: {[amplifyEventId: string]: MongoEventModel} = {};
+
+    // EVENTS
+    for (const amplifyEvent of eventItems) {
+        const amplify_id = amplifyEvent.id;
+        const mongoEvent = {
+            ...convertEvent(amplifyEvent),
+            categories: amplifyEventIdToMongoCategories[amplify_id],
+        };
+        const res = await mongodb.collection<MongoEventModel>('events').findOneAndUpdate(
+            { amplify_id },
+            { $set: mongoEvent },
+            { upsert: true }
+        )
+        amplifyEventIdToMongoEventId[amplify_id] = getResId(res);
+        amplifyEventIdToMongoEvent[amplify_id] = mongoEvent;
+    }
+
+    console.log('amplifyEventIdToMongoEventId', amplifyEventIdToMongoEventId)
+
+
+    const amplifyUserIdToData: {[amplifyId: string]: {
+        mongoId: ObjectId,
+        followingCount: number,
+        followerCount: number,
+    }} = {};
+
+    // INDEX TESTS:
+    for (let i=0; i<1; i++) {
+        const amplifyUser = userItems[i];
+        const mongoUser = convertUser(amplifyUser);
+        const amplify_id = amplifyUser.id;
+        // const res = await mongodb.collection<MongoUser>('users').createIndex({amplify_id: 1});
+        const res = await mongodb.collection<MongoUser>('users').find({amplify_id}).explain();
+        console.log('res',res)
+    }
+
+    // USERS (part one)
+    // for (const amplifyUser of userItems) {
+    //     const mongoUser = convertUser(amplifyUser);
+    //     const amplify_id = amplifyUser.id;
+
+    //     const res = await mongodb.collection<MongoUser>('users').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: mongoUser },
     //         { upsert: true }
     //     )
-    // });
+    //     console.log('user upserted', getResId(res))
+    //     amplifyUserIdToData[amplify_id] = {
+    //         mongoId: getResId(res), // this is the MONGO id... not the amplify id. But that's actually good
+    //         followingCount: 0,
+    //         followerCount: 0,
+    //     };
+    // }
 
-    // const users = mongodb.collection<User>("users");
-    // const result = await users.find({}).toArray();
-    // console.log('mongodb', result)
+    // RELATIONSHIPS
+    // for (const amplifyRelationship of relationshipItems) {
+    //     const amplify_id = amplifyRelationship.id;
+    //     const amplifyFollowingUserId = amplifyRelationship.followingUserId;
+    //     const amplifyFollowedUserId = amplifyRelationship.followedUserId;
+    //     const res = await mongodb.collection<MongoRelationship>('relationships').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: {
+    //             followingUserId: amplifyUserIdToData[amplifyFollowingUserId].mongoId,
+    //             followedUserId: amplifyUserIdToData[amplifyFollowedUserId].mongoId,
+    //         } },
+    //         { upsert: true }
+    //     )
+    //     console.log('relationship upserted', getResId(res))
+    //     // update following counts on the user
+    //     amplifyUserIdToData[amplifyFollowingUserId].followingCount += 1;
+    //     amplifyUserIdToData[amplifyFollowedUserId].followerCount += 1;
+    // }
 
-    // const a = await mongodb
-    //   .collection('test').indexes();
-    //   console.log('a',a)
+    // console.log('amplifyIdToMongoId', amplifyUserIdToData) // this logs
+    
+    // const amplifyMoviePersonOrSongToMongoId: {[amplifyId: string]: ObjectId} = {};
 
+    // // MOVIES
+    // for (const amplifyMovie of movieItems) {
+    //     const amplify_id = amplifyMovie.id;
+    //     const res = await mongodb.collection<MongoMovie>('movies').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: convertMovie(amplifyMovie) },
+    //         { upsert: true }
+    //     )
+    //     console.log('movie upserted', getResId(res))
+    //     amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
+    // }
+    // // PERSONS
+    // for (const amplifyPerson of personItems) {
+    //     const amplify_id = amplifyPerson.id;
+    //     const res = await mongodb.collection<MongoPerson>('persons').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: convertPerson(amplifyPerson) },
+    //         { upsert: true }
+    //     )
+    //     console.log('person upserted', getResId(res))
+    //     amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
+    // }
+    // // SONGS
+    // for (const amplifySong of songItems) {
+    //     const amplify_id = amplifySong.id;
+    //     const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifySong.movieId];
+    //     const res = await mongodb.collection<MongoSong>('songs').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: convertSong(amplifySong, mongoMovieId) },
+    //         { upsert: true }
+    //     )
+    //     console.log('song upserted', getResId(res))
+    //     amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
+    // }
 
-    // const searchRes = await mongodb
-    //   .collection('test')
-    //   .find({ $text: { $search: 'hi' } }).toArray();
-    // console.log('searchRes', searchRes);
+    // // CONTENDERS
+    // const amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId} = {};
+    // const amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: MongoContender} = {};
+    // for (const amplifyContender of contenderItems) {
+    //     const amplify_id = amplifyContender.id;
+    //     const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifyContender.movieId];
+    //     const mongoEventId = amplifyEventIdToMongoEventId[amplifyContender.eventId];
+    //     const categoryName = amplifyCategoryIdToCategory[amplifyContender.categoryId].name;
+    //     const songId = amplifyContender.songId && amplifyMoviePersonOrSongToMongoId[amplifyContender.songId] || undefined;
+    //     const personId = amplifyContender.personId && amplifyMoviePersonOrSongToMongoId[amplifyContender.personId] || undefined;
+    //     const mongoContender = convertContender(amplifyContender, mongoMovieId, mongoEventId, categoryName, songId, personId);
+    //     const res = await mongodb.collection<MongoContender>('contenders').findOneAndUpdate(
+    //         { amplify_id },
+    //         { $set: mongoContender },
+    //         { upsert: true }
+    //     )
+    //     console.log('contender upserted', getResId(res))
+    //     amplifyContenderIdToMongoContenderId[amplify_id] = getResId(res);
+    //     amplifyContenderIdToMongoContender[amplify_id] = mongoContender;
+    // }
+
+    // // PREDICTIONSETS
+    // // First, loop through events
+    // // Then, loop through users
+    // // For each combination, filter the prediction sets, then pass that info into convertPredictionSet
+    // // Then, upsert that prediction set
+    // // As we go, update the user's prediction set list
+    // for (const amplifyEvent of eventItems) {
+    //     const amplifyEventId = amplifyEvent.id;
+    //     const mongoDbEventId = amplifyEventIdToMongoEventId[amplifyEvent.id];
+    //     for (const amplifyUser of userItems) {
+    //         const amplifyUserId = amplifyUser.id;
+    //         const mongoDbUserId = amplifyUserIdToData[amplifyUser.id].mongoId;
+    //         const filteredPredictionSets = predictionSetItems.filter((predictionSet)=>predictionSet.eventId === amplifyEventId && predictionSet.userId === amplifyUserId);
+    //         const filteredPredictionSetIds = filteredPredictionSets.map((predictionSet)=>predictionSet.id);
+    //         const filteredPredictions = predictionItems.filter((prediction)=>filteredPredictionSetIds.includes(prediction.predictionSetId));
+    //         const mongoDbPredictionSet = convertPredictionSet(
+    //             filteredPredictionSets,
+    //             filteredPredictions,
+    //             mongoDbUserId,
+    //             mongoDbEventId,
+    //             amplifyCategoryIdToCategory,
+    //             amplifyContenderIdToMongoContenderId,
+    //             amplifyContenderIdToMongoContender,
+    //         );
+    //         const res = await mongodb.collection<MongoPredictionSet>('predictionsets').findOneAndUpdate(
+    //             { userId: mongoDbUserId, eventId: mongoDbEventId, yyyymmdd: mongoDbPredictionSet.yyyymmdd },
+    //             { $set: mongoDbPredictionSet },
+    //             { upsert: true }
+    //         )
+    //         console.log('predictionset upserted', getResId(res))
+    //         const predictionSetId = getResId(res);
+    //         const iterableCategories = Object.entries(mongoDbPredictionSet.categories);
+    //         iterableCategories.sort(([,p1], [,p2])=>p1.createdAt.getTime() - p2.createdAt.getTime());
+    //         const fiveMostRecentPredictions: iRecentPredictions = iterableCategories.slice(0,5).map(([categoryName, category])=>{
+    //             const { awardsBody, year } = amplifyEventIdToMongoEvent[amplifyEventId];
+    //             return {
+    //                 awardsBody,
+    //                 year,
+    //                 category: categoryName,
+    //                 predictionSetId,
+    //                 createdAt: category.createdAt,
+    //                 topPredictions: category.predictions.slice(0,5),
+    //             }
+    //         })
+    //         await mongodb.collection<MongoUser>('users').updateOne(
+    //             { _id: mongoDbUserId },
+    //             { $set: { recentPredictions: fiveMostRecentPredictions, eventsPredicting: [mongoDbEventId] } }
+    //         )
+    //         console.log('user recent predictions updated')
+    //     }
+    // }
 }
 
 handler();

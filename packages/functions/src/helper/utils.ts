@@ -16,7 +16,9 @@ export const getAggregatePagination = (
 ): Document[] => [{ $skip: (pageNumber - 1) * limit }, { $limit: limit }];
 
 export const dateToYyyymmdd = (date: Date) => {
-  return parseInt(`${date.getFullYear()}${date.getMonth()}${date.getDate()}`);
+  return parseInt(
+    `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
+  );
 };
 
 export const getDate = (daysFromToday?: number) => {

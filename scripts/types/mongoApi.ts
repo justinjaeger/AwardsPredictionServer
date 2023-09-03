@@ -1,19 +1,19 @@
-const { ObjectId } = require("mongodb");
+import { ObjectId } from "mongodb";
 
-enum Phase {
+export enum Phase {
   CLOSED = "CLOSED",
   SHORTLIST = "SHORTLIST",
   NOMINATION = "NOMINATION",
   WINNER = "WINNER",
 }
 
-enum UserRole {
+export enum UserRole {
   ADMIN = "ADMIN",
   TESTER = "TESTER",
   USER = "USER",
 }
 
-enum AwardsBody {
+export enum AwardsBody {
   ACADEMY_AWARDS = "ACADEMY_AWARDS",
   GOLDEN_GLOBES = "GOLDEN_GLOBES",
   CRITICS_CHOICE = "CRITICS_CHOICE",
@@ -30,7 +30,7 @@ enum AwardsBody {
   MPSE = "MPSE",
 }
 
-enum EventStatus {
+export enum EventStatus {
   NOMS_STAGING = "NOMS_STAGING", // before nominations go public
   NOMS_LIVE = "NOMS_LIVE", // when everyone can predict nominations
   WINS_STAGING = "WINS_STAGING", // when nominations are being announced + prepared
@@ -38,13 +38,13 @@ enum EventStatus {
   ARCHIVED = "ARCHIVED", // when winners have been announced and such
 }
 
-enum CategoryType {
+export enum CategoryType {
   FILM = "FILM",
   PERFORMANCE = "PERFORMANCE",
   SONG = "SONG",
 }
 
-enum CategoryName {
+export enum CategoryName {
   PICTURE = "PICTURE",
   DIRECTOR = "DIRECTOR",
   ACTOR = "ACTOR",
@@ -88,51 +88,46 @@ enum CategoryName {
   BREAKTHROUGH = "BREAKTHROUGH",
 }
 
-type MongoActivePrediction = {
-  eventId: typeof ObjectId;
-  userId: typeof ObjectId;
-  contenderId: typeof ObjectId;
-  expireAt: Date;
-  place: number;
-  phase?: Phase;
-}
-
-type MongoCategoryUpdateLog = {
-  userId: typeof ObjectId;
-  eventId: typeof ObjectId;
+export type MongoCategoryUpdateLog = {
+  userId: ObjectId;
+  eventId: ObjectId;
   category: CategoryName;
   yyyymmddUpdates: Record<number, boolean>;
 }
 
-type MongoContender = {
-  eventId: typeof ObjectId;
-  movieId: typeof ObjectId;
+export type MongoContender = {
+  eventId: ObjectId;
+  movieId: ObjectId;
   category: CategoryName;
   isHidden?: boolean;
   accolade?: Phase;
-  songId?: typeof ObjectId;
-  personId?: typeof ObjectId;
-  numPredicting?: Record<number, number>;
+  songId?: ObjectId;
+  personId?: ObjectId;
+  numPredicting?: Record<number, number>; // for community predictions only
+  amplify_id?: string;
 }
 
-type MongoEventModel = {
-  categories: Record<
+export type iMongoCategories = Record<
     CategoryName,
     {
-      type: CategoryType;
-      phase?: Phase;
-      shortlistDateTime?: Date;
+        type: CategoryType;
+        phase?: Phase;
+        shortlistDateTime?: Date;
     }
-  >;
+>;
+
+export type MongoEventModel = {
+  categories: iMongoCategories;
   awardsBody: AwardsBody;
   year: number;
   status: EventStatus;
   liveAt?: Date;
   nomDateTime?: Date;
   winDateTime?: Date;
+  amplify_id?: string;
 }
 
-type MongoIMovieCategoryCredit =
+export type MongoIMovieCategoryCredit =
   | "directing"
   | "screenplay"
   | "cinematography"
@@ -142,7 +137,7 @@ type MongoIMovieCategoryCredit =
   | "score"
   | "vfx";
 
-type IMovieCategoryCredit =
+export type IMovieCategoryCredit =
   | 'directing'
   | 'screenplay'
   | 'cinematography'
@@ -152,9 +147,9 @@ type IMovieCategoryCredit =
   | 'score'
   | 'vfx';
 
-type MongoMovie = {
+export type MongoMovie = {
   tmdbId: number;
-  title: string;
+  title?: string;
   year?: number;
   studio?: string;
   plot?: string;
@@ -163,32 +158,34 @@ type MongoMovie = {
   posterPath?: string;
   backdropPath?: string;
   categoryCredits: Record<IMovieCategoryCredit, string[]>;
+  amplify_id?: string;
 }
 
-type MongoPerson = {
+export type MongoPerson = {
   tmdbId: number;
   imdbId?: string;
   name?: string;
   posterPath?: string;
+  amplify_id?: string;
 }
 
-type iPredictions = Array<{
-  contenderId: typeof ObjectId;
+export type iPredictions = Array<{
+  contenderId: ObjectId;
   ranking: number;
-  movieId: typeof ObjectId;
-  personId?: typeof ObjectId;
-  songId?: typeof ObjectId;
+  movieId: ObjectId;
+  personId?: ObjectId;
+  songId?: ObjectId;
   numPredicting?: Record<number, number>; // only applies to community predictions
 }>;
 
-type MongoiCategoryPrediction = {
+export type MongoiCategoryPrediction = {
   type: CategoryType;
   createdAt: Date;
   predictions: iPredictions;
   phase?: Phase | undefined;
 };
 
-type iCategoryPrediction = {
+export type iCategoryPrediction = {
   type: CategoryType;
   createdAt: Date;
   predictions: iPredictions;
@@ -196,52 +193,59 @@ type iCategoryPrediction = {
 };
 
 
-type MongoPredictionSet = {
-  userId: typeof ObjectId | "community";
-  eventId: typeof ObjectId;
+export type MongoPredictionSet = {
+  userId: ObjectId | "community";
+  eventId: ObjectId;
   yyyymmdd: number;
   categories: {
     [key in CategoryName]: iCategoryPrediction;
   };
+  amplify_id?: string;
 }
 
-type MongoRelationship = {
-  followedUserId: typeof ObjectId;
-  followingUserId: typeof ObjectId;
+export type MongoRelationship = {
+  followedUserId: ObjectId;
+  followingUserId: ObjectId;
+  amplify_id?: string;
 }
 
-type MongoRelationshipWithUser = MongoRelationship & {
+export type MongoRelationshipWithUser = MongoRelationship & {
   followedUserList: MongoUser[];
   followingUserList: MongoUser[];
 }
 
-type MongoSong = {
-  movieId: typeof ObjectId;
+export type MongoSong = {
+  movieId: ObjectId;
   title: string;
   artist?: string;
+  amplify_id?: string;
 }
 
-type MongoToken = {
-  userId: typeof ObjectId;
+export type MongoToken = {
+  userId: ObjectId;
   token: string;
 }
 
-type MongoUser = {
+export type iRecentPredictions = Array<{
+    awardsBody: string;
+    category: string;
+    year: number;
+    predictionSetId: ObjectId;
+    createdAt: Date;
+    topPredictions: iPredictions;
+}>
+
+export type MongoUser = {
   email: string;
   oauthId?: string;
   username?: string;
   name?: string;
   bio?: string;
   role?: UserRole;
+  image?: string;
   followingCount?: number;
   followerCount?: number;
-  eventsPredicting?: typeof ObjectId[];
-  recentPredictionSets?: Array<{
-    awardsBody: string;
-    category: string;
-    year: number;
-    predictionSetId: typeof ObjectId;
-    createdAt: Date;
-    topPredictions: iPredictions;
-  }>;
+  eventsPredicting?: ObjectId[];
+  recentPredictionSets?: iRecentPredictions;
+  amplify_id?: string;
 }
