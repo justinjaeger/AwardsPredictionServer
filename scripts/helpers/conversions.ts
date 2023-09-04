@@ -32,12 +32,8 @@ export const amplifyCategoryNameToMongoCategoryName = (type: AmplifyCategoryName
 // I have to create user FIRST, so how am I going to get the predictionsets first? It's circular
 export const convertUser = (
     user: AmplifyUser,
-    // followingCount: number,
-    // followerCount: number,
-    // recentPredictionSets: iRecentPredictions,
-    // eventsPredicting: typeof ObjectId[]
 ): MongoUser => {
-    return {
+    const obj: MongoUser = {
         amplify_id: user.id,
         email: user.email,
         name: user.name || undefined,
@@ -45,11 +41,9 @@ export const convertUser = (
         role: amplifyRoleToMongoRole(user.role),
         image: user.image ?? undefined,
         bio: user.bio || undefined,
-        // followingCount,
-        // followerCount,
-        // recentPredictionSets,
-        // eventsPredicting,
-    }
+    };
+    if (user.oauthId) obj.oauthId = user.oauthId;
+    return obj;
 }
 
 export const convertRelationship = (
