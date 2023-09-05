@@ -136,10 +136,9 @@ export const dateToYyyymmdd = (date: Date) => {
   );
 };
 
-// How can we get the user's 5 most recent predictionsets from this? we use the createdAt field
 export const convertPredictionSet = (
-    amplifyPredictionSets: AmplifyPredictionSet[],
-    amplifyPredictions: AmplifyPrediction[],
+    amplifyPredictionSets: AmplifyPredictionSet[], // keep in mind, amplify has one predictionset per cat. we have per event
+    amplifyPredictions: AmplifyPrediction[], //predictions from ANY prediction set
     mongoUserId: ObjectId,
     mongoEventId: ObjectId,
     amplifyCategoryIdToCategory: {[amplifyCategoryId: string]: { type: CategoryType, name: CategoryName }},
@@ -147,18 +146,21 @@ export const convertPredictionSet = (
     amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: MongoContender},
 ): MongoPredictionSet => {
     let latestYyyymmdd = 0;
+    // creates the categories object on the predictionset
     const categories = amplifyPredictionSets.reduce((acc, predictionSet)=>{
         const yyyymmdd = dateToYyyymmdd(new Date(predictionSet.createdAt));
         latestYyyymmdd = Math.max(latestYyyymmdd, yyyymmdd);
         const { name, type } = amplifyCategoryIdToCategory[predictionSet.categoryId];
-        const predictionsInPredictionSet = amplifyPredictions.filter(prediction=>prediction.predictionSetId === predictionSet.id);
-        const predictions = predictionsInPredictionSet.map((prediction)=>{
+        const predictionsInSet = amplifyPredictions.filter((prediction)=>prediction.predictionSetId === predictionSet.id);
+        const predictions = predictionsInSet.map((prediction)=>{
+            const { movieId, personId, songId } = amplifyContenderIdToMongoContender[prediction.contenderId];
+            const contenderId = amplifyContenderIdToMongoContenderId[prediction.contenderId];
             return {
-                contenderId: amplifyContenderIdToMongoContenderId[prediction.contenderId],
+                contenderId,
                 ranking: prediction.ranking,
-                movieId: amplifyContenderIdToMongoContender[prediction.contenderId].movieId,
-                personId: amplifyContenderIdToMongoContender[prediction.contenderId].personId,
-                songId: amplifyContenderIdToMongoContender[prediction.contenderId].songId,
+                movieId,
+                personId,
+                songId,
             }
         })
         acc[name] = {
@@ -169,7 +171,6 @@ export const convertPredictionSet = (
         return acc;
     }, {} as {[key in CategoryName]: iCategoryPrediction})
     return {
-        // amplify_id: amplifyPredictionSets.id, // can't do it; 23 predictionsets therein
         userId: mongoUserId,
         eventId: mongoEventId,
         yyyymmdd: latestYyyymmdd,

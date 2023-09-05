@@ -1,5 +1,5 @@
 import { ModifyResult, ObjectId } from "mongodb";
-import { ScanCommand } from "@aws-sdk/client-dynamodb";
+import { AttributeValue, ScanCommand, ScanCommandOutput } from "@aws-sdk/client-dynamodb";
 import { 
     AmplifyCategory, 
     AmplifyContender, 
@@ -48,27 +48,8 @@ import { CategoryName, CategoryType, MongoContender, MongoEventModel, MongoMovie
  * Not even the community predictions.
  * - The cron func should just generate that for us based on current user predictions
  * 
- * DOING RELATIONSHIPS
- * - I might make a legacy_id field on each table so that I can keep track of what was migrated
- * - I may also have to create an object that associates previous id with new ids
- * - Take users for example. I'm going to put all the new user info into mongodb.
- * but the id is going to be unique and new, and after creating, I'll have to harness it.
- * In the future, the old id can reference the new id.
- * Then, when it comes to relationship, I'll have to do a lookup, what was the old id and what's its' new id? Then create the relationship like that.
- * - What about prediction sets? Those exist in a few different places, and write to a few different tables.
- * I'll just create the predictionset, then I'll go back and add to that user field by referencing the old id.
- * 
- * How I can run this multiple times
- * - It won't create the thing if the same values already exist
- * - but what if a user changes their name n stuff?
- * - We have to use their ID and read from the MONGODB tables, and see does a user exist who has this aws_id?
- * - If so, update their data, don't create new data.
- * - Should enable us to run as many times as we want without overwriting data.
- * - Maybe there's some "check if exists and update" func we can write?
- * 
  * What about OLD DUPLICATES???
- * - I'm def gonna need to elimnate them during this migration,
- * - but what I actually should do is run the deletion scripts first, then run this
+ * - What I actually should do is run the deletion scripts first, then run this
  * - if a duplicate comes up, Mongodb unique indexes should catch it, then we can go and run that amplify script
  * 
  * What about IMAGES??
@@ -88,6 +69,7 @@ const predictionTable = 'Prediction-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionSetTable = 'PredictionSet-jrjijr2sgbhldoizdkwwstdpn4-prod'
 
 // Id is going to be in a different place depending on if it updated or created
+// NOTE: If last set of data was inaccurate, should delete all predictionsets before running
 const getResId = (res:any): ObjectId => res.value?._id || res.lastErrorObject?.upserted;
 
 async function handler() {
@@ -98,37 +80,55 @@ async function handler() {
     // const a = await mongodb.collection('relationships').indexes();
     // console.log('done:', a)
 
+    /**
+     * NOTE: If the total size of scanned items exceeds the maximum dataset size limit of 1 MB, the scan completes and results are returned to the user.
+     * This means we have to paginate so we don't miss any items
+     */
     const getTableItems = async <AmplifyModel>(tableName: string) => {
-        //@ts-ignore
-        return (await dynamodb.send((new ScanCommand({ TableName: tableName })))).Items
-            .map((item)=>{
-                const itemKeys = Object.keys(item);
-                const itemValues = Object.values(item);
-                const itemEntries = itemKeys.map((key, index)=>{
-                    const val = itemValues[index];
-                    //@ts-ignore
-                    const str = val.S;
-                    //@ts-ignore
-                    const number = Number(val.N);
-                    if (str === 'TRUE') return [key, true];
-                    if (str === 'FALSE') return [key, false];
-                    return [key, (number || str)];
-                })
-                return Object.fromEntries(itemEntries);
-            }) as AmplifyModel[];
+        const result = [];
+        let hasMoreScans = true;
+        let ExclusiveStartKey: Record<string, AttributeValue> | undefined = undefined;
+        //  If LastEvaluatedKey is present in the response, pagination is required to complete the full table scan.
+        while (hasMoreScans) {
+            const res: ScanCommandOutput = await dynamodb.send((new ScanCommand({ TableName: tableName, ExclusiveStartKey })));
+            ExclusiveStartKey = res.LastEvaluatedKey;
+            if (!ExclusiveStartKey) {
+                hasMoreScans = false;
+            }
+            if (res.Items) {
+                const formattedItems = res.Items.map((item)=>{
+                    const itemKeys = Object.keys(item);
+                    const itemValues = Object.values(item);
+                    const itemEntries = itemKeys.map((key, index)=>{
+                        const val = itemValues[index];
+                        //@ts-ignore
+                        const str = val.S;
+                        //@ts-ignore
+                        const number = Number(val.N);
+                        if (str === 'TRUE') return [key, true];
+                        if (str === 'FALSE') return [key, false];
+                        return [key, (number || str)];
+                    })
+                    return Object.fromEntries(itemEntries);
+                }) as AmplifyModel[];
+                result.push(...formattedItems);
+            }
+        }
+        return result;
     }
     
     // get all dynamodb items
+    console.log('fetching dynamodb items...')
     const userItems = await getTableItems<AmplifyUser>(userTable)
-    const relationshipItems = await getTableItems<AmplifyRelationship>(relationshipTable)
+    const relationshipItems = await getTableItems<AmplifyRelationship>(relationshipTable) // 4620, actually 6,232
     const categoryItems = await getTableItems<AmplifyCategory>(categoryTable)
     const eventItems = await getTableItems<AmplifyEvent>(eventTable)
     const movieItems = await getTableItems<AmplifyMovie>(movieTable)
     const personItems = await getTableItems<AmplifyPerson>(personTable)
     const songItems = await getTableItems<AmplifySong>(songTable)
-    const contenderItems = await getTableItems<AmplifyContender>(contenderTable)
-    const predictionItems = await getTableItems<AmplifyPrediction>(predictionTable)
-    const predictionSetItems = await getTableItems<AmplifyPredictionSet>(predictionSetTable)
+    const contenderItems = await getTableItems<AmplifyContender>(contenderTable) // 977, correct
+    const predictionItems = await getTableItems<AmplifyPrediction>(predictionTable) // TODO: this says 4540 items but it's actually 99,875 items
+    const predictionSetItems = await getTableItems<AmplifyPredictionSet>(predictionSetTable) // 3856 but is actually 12,274
 
     // CATEGORIES
     const amplifyEventIdToMongoCategories: {[amplifyEventId: string]: iMongoCategories} = {};
@@ -219,10 +219,17 @@ async function handler() {
 
     // RELATIONSHIPS
     const relationshipReqs: Promise<ModifyResult<MongoRelationship>>[] = [];
+    // to help not push duplicates:
+    const seenRelationships: {[key: string]: boolean} = {};
     for (const amplifyRelationship of relationshipItems) {
         const amplify_id = amplifyRelationship.id;
         const amplifyFollowingUserId = amplifyRelationship.followingUserId;
         const amplifyFollowedUserId = amplifyRelationship.followedUserId;
+        if (seenRelationships[`${amplifyFollowingUserId}-${amplifyFollowedUserId}`]) {
+            console.log('duplicate relationship found', amplifyRelationship)
+            continue;
+        } 
+        seenRelationships[`${amplifyFollowingUserId}-${amplifyFollowedUserId}`] = true;
         relationshipReqs.push(
             mongodb.collection<MongoRelationship>('relationships').findOneAndUpdate(
                 { amplify_id },
@@ -349,22 +356,29 @@ async function handler() {
         const mongoDbEventId = amplifyEventIdToMongoEventId[amplifyEvent.id];
 
         const amplifyIdToMongoPredictionSet: {[amplifyId: string]: MongoPredictionSet} = {};
-        const predictionSetReqs: Promise<ModifyResult<MongoPredictionSet>>[] = [];
+        const predictionSetReqs: Promise<ModifyResult<MongoPredictionSet> | void>[] = [];
         for (const amplifyUser of userItems) {
             const amplifyUserId = amplifyUser.id;
             const mongoDbUserId = amplifyUserIdToData[amplifyUserId].mongoId;
+            // get predictionsets where userId and eventId match
             const filteredPredictionSets = predictionSetItems.filter((predictionSet)=>predictionSet.eventId === amplifyEventId && predictionSet.userId === amplifyUserId);
-            const filteredPredictionSetIds = filteredPredictionSets.map((predictionSet)=>predictionSet.id);
-            const filteredPredictions = predictionItems.filter((prediction)=>filteredPredictionSetIds.includes(prediction.predictionSetId));
+            if (filteredPredictionSets.length === 0) {
+                // create a bogus promise so that the below loop doesn't break - we need the index to match
+                predictionSetReqs.push(Promise.resolve())
+                continue;
+            };
             const mongoDbPredictionSet = convertPredictionSet(
                 filteredPredictionSets,
-                filteredPredictions,
+                predictionItems,
                 mongoDbUserId,
                 mongoDbEventId,
                 amplifyCategoryIdToCategory,
                 amplifyContenderIdToMongoContenderId,
                 amplifyContenderIdToMongoContender,
             );
+            // keep in mind: we just recorded these yesterday, so they won't match today.
+            // and yesterday's were broken.
+            // So we should delete all in the table, before running this again
             predictionSetReqs.push(
                 mongodb.collection<MongoPredictionSet>('predictionsets').findOneAndUpdate(
                     { userId: mongoDbUserId, eventId: mongoDbEventId, yyyymmdd: mongoDbPredictionSet.yyyymmdd },
@@ -380,6 +394,7 @@ async function handler() {
         const userNestedFieldReqs = [];
         for (let i in predictionSetRes) {
             const res = predictionSetRes[i];
+            if (!res) continue; // because some promises are bogus
             const amplifyUserId = userItems[i].id;
             const mongoDbUserId = amplifyUserIdToData[amplifyUserId].mongoId;
             const predictionSetId = getResId(res);
