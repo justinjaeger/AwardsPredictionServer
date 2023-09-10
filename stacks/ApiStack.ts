@@ -64,12 +64,26 @@ export function ApiStack({ stack }: StackContext) {
 
   new Cron(stack, "cron-updateTmdb", {
     schedule: "rate(1 day)",
-    job: `${PATH}/cron/updateTmdb.handler`,
+    job: {
+        function: { 
+            environment: {
+                MONGODB_URI:MONGODB_URI,
+            },
+            handler: `${PATH}/cron/updateTmdb.handler`,
+        }
+    },
   });
 
   new Cron(stack, "cron-recordCommunityHistory", {
     schedule: "rate(1 hour)",
-    job: `${PATH}/cron/recordCommunityHistory.handler`,
+    job: {
+        function: { 
+            environment: {
+                MONGODB_URI:MONGODB_URI,
+            },
+            handler: `${PATH}/cron/recordCommunityHistory.handler`,
+        }
+    },
   });
 
 
