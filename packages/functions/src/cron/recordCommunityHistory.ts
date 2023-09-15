@@ -20,7 +20,7 @@ import {
  */
 
 export const handler = dbWrapper(async ({ db }) => {
-  const thirtyDaysAgo = getDate(30);
+  const thirtyDaysAgo = getDate(-30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
   const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
 
@@ -106,6 +106,7 @@ export const handler = dbWrapper(async ({ db }) => {
     // tally up points for each contenderId. this is used to sort the contenders
     const pointsPerContenderId: { [contenderId: string]: number } = {};
     for (const categoryName of Object.keys(categories)) {
+      if (!numPredicting[categoryName]) continue;
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
@@ -130,6 +131,7 @@ export const handler = dbWrapper(async ({ db }) => {
     for (const [categoryName, { type, phase }] of Object.entries(categories)) {
       // we need numPredicting amount of predictions for each category
       const predictions: iPredictions = [];
+      if (!numPredicting[categoryName]) continue;
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
@@ -169,42 +171,19 @@ export const handler = dbWrapper(async ({ db }) => {
       ? tomorrowYyyymmdd
       : todayYyyymmdd;
 
-    // get most recent
-    console.log('getting most recent community prediction...');
-    const mostRecentPredictionSet = await db
-      .collection<PredictionSet>('predictionsets')
-      .findOne(
-        { userId: COMMUNITY_USER_ID, eventId: new ObjectId(eventId) },
-        { sort: { yyyymmdd: -1 } }
-      );
-
-    const isNewDate =
-      mostRecentPredictionSet && yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
-
-    // create predictionset this is the first for the event, or the first on this date
-    if (!mostRecentPredictionSet || isNewDate) {
-      console.log('creating new predictionset for the day...');
-      await db.collection<PredictionSet>('predictionsets').insertOne({
+    // upsert the predictionset - will create new if it's a new day
+    await db.collection<PredictionSet>('predictionsets').findOneAndUpdate(
+      {
         userId: COMMUNITY_USER_ID,
         eventId: new ObjectId(eventId),
-        yyyymmdd,
-        // @ts-expect-error - This should only have partial data
-        categories: categoryPredictions
-      });
-      // else if predictionset exists for event, update itwe
-    } else {
-      // update the current prediction set
-      console.log(`updating today's spredictionset...`);
-      await db.collection<PredictionSet>('predictionsets').updateOne(
-        // @ts-expect-error - this particular ID is a string
-        { _id: COMMUNITY_USER_ID },
-        {
-          $set: {
-            categories: categoryPredictions
-          }
-        }
-      );
-    }
+        yyyymmdd
+      },
+      {
+        // @ts-expect-error - allowing this to be partial
+        $set: { categories: categoryPredictions }
+      },
+      { upsert: true }
+    );
   }
 
   console.log('done!');
