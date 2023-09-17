@@ -67,7 +67,8 @@ export function ApiStack({ stack }: StackContext) {
     job: {
         function: { 
             environment: {
-                MONGODB_URI:MONGODB_URI,
+                MONGODB_URI,
+                TMDB_API_KEY: process.env.TMDB_API_KEY ?? '',
             },
             handler: `${PATH}/cron/updateTmdb.handler`,
         }
@@ -79,7 +80,7 @@ export function ApiStack({ stack }: StackContext) {
     job: {
         function: { 
             environment: {
-                MONGODB_URI:MONGODB_URI,
+                MONGODB_URI,
             },
             handler: `${PATH}/cron/recordCommunityHistory.handler`,
         }
