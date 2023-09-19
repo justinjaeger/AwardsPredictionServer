@@ -28,6 +28,7 @@ export function ApiStack({ stack }: StackContext) {
           MONGODB_URI: MONGODB_URI,
           JWT_SECRET: process.env.JWT_SECRET || '',
           TMDB_API_KEY: process.env.TMDB_API_KEY || '',
+          SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
         },
       },
     },
@@ -44,6 +45,8 @@ export function ApiStack({ stack }: StackContext) {
       "GET /events": `${PATH}/event.list`,
       "GET /categoryupdatelogs": `${PATH}/categoryupdatelogs.get`,
       "GET /jwt": `${PATH}/jwt.get`,
+      "GET /email/send": `${PATH}/email.send`,
+      "GET /email/verify": `${PATH}/email.verify`,
       // (fake post requests)
       "POST /movies": `${PATH}/movie.getBatch`,
       "POST /persons": `${PATH}/movie.getBatch`,
@@ -64,12 +67,27 @@ export function ApiStack({ stack }: StackContext) {
 
   new Cron(stack, "cron-updateTmdb", {
     schedule: "rate(1 day)",
-    job: `${PATH}/cron/updateTmdb.handler`,
+    job: {
+        function: { 
+            environment: {
+                MONGODB_URI,
+                TMDB_API_KEY: process.env.TMDB_API_KEY ?? '',
+            },
+            handler: `${PATH}/cron/updateTmdb.handler`,
+        }
+    },
   });
 
   new Cron(stack, "cron-recordCommunityHistory", {
     schedule: "rate(1 hour)",
-    job: `${PATH}/cron/recordCommunityHistory.handler`,
+    job: {
+        function: { 
+            environment: {
+                MONGODB_URI,
+            },
+            handler: `${PATH}/cron/recordCommunityHistory.handler`,
+        }
+    },
   });
 
 

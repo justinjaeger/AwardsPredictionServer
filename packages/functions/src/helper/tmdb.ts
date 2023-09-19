@@ -3,20 +3,13 @@ import TmdbRequests from './tmdbRequests';
 import { type ApiResponse } from 'src/types/responses';
 
 const getMovieAsDbType = async (
-  tmdbId: number
+  tmdbId: number,
+  i?: number
 ): Promise<ApiResponse<Movie>> => {
   try {
-    const movieResult = await TmdbRequests.getMovie(tmdbId);
-    if (movieResult?.status === 'error') {
-      throw new Error(movieResult?.message);
-    }
-    const movie = movieResult.data;
+    const { data: movie } = await TmdbRequests.getMovie(tmdbId);
 
-    const movieCreditsResult = await TmdbRequests.getMovieCredits(tmdbId);
-    if (movieCreditsResult?.status === 'error') {
-      throw new Error(movieCreditsResult?.message);
-    }
-    const movieCredits = movieCreditsResult.data;
+    const { data: movieCredits } = await TmdbRequests.getMovieCredits(tmdbId);
 
     const directing = movieCredits.crew
       .filter((c) => c.job.toLowerCase() === 'director')
@@ -83,6 +76,7 @@ const getMovieAsDbType = async (
       data
     };
   } catch (err) {
+    console.log('error:', err);
     return {
       statusCode: 500,
       message: 'tmdb error',
@@ -95,11 +89,7 @@ const getPersonAsDbType = async (
   tmdbId: number
 ): Promise<ApiResponse<Person>> => {
   try {
-    const personResult = await TmdbRequests.getPerson(tmdbId);
-    if (personResult?.status === 'error') {
-      throw new Error(personResult?.message);
-    }
-    const person = personResult.data;
+    const { data: person } = await TmdbRequests.getPerson(tmdbId);
 
     const data: Person = {
       tmdbId,

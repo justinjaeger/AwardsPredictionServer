@@ -15,19 +15,23 @@ import {
 
 /**
  * Records community predictions every hour
+ * logs one predictionset per event with userId = 'community'
  * Creates a new log on each unique day
  */
+
 export const handler = dbWrapper(async ({ db }) => {
-  const thirtyDaysAgo = getDate(30);
+  const thirtyDaysAgo = getDate(-30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
   const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
 
   // get list of events that are not archived, we'll query only those prediction sets
+  console.log('getting events...');
   const activeEvents = await db
     .collection<EventModel>('events')
     .find({ status: { $ne: EventStatus.ARCHIVED } })
     .toArray();
 
+  console.log('getting users...');
   const allUsers = await db
     .collection('users')
     .find({}, { projection: { _id: 1 } })
@@ -37,13 +41,15 @@ export const handler = dbWrapper(async ({ db }) => {
   // for each active event, take each user's most recent predictionset
   for (const { _id: eventId, nomDateTime, categories } of activeEvents) {
     const predictionSetRequests = allUserIds.map(
-      (userId) =>
+      async (userId) =>
         db
           .collection<PredictionSet>('predictionsets')
           .findOne({ userId, eventId }, { sort: { yyyymmdd: -1 } }) // returns largest (most recent) first
     );
     // execute all requests in parallel
+    console.log('requesting user predictionsets...');
     const predictionSets = await Promise.all(predictionSetRequests);
+    console.log('done requesting user predictionsets');
 
     // tally up the current community rankings
     const numPredicting: {
@@ -59,6 +65,7 @@ export const handler = dbWrapper(async ({ db }) => {
         songId?: ObjectId;
       };
     } = {};
+    console.log('1');
     for (const predictionSet of predictionSets) {
       if (!predictionSet) continue;
       for (const [categoryName, categoryPrediction] of Object.entries(
@@ -95,15 +102,18 @@ export const handler = dbWrapper(async ({ db }) => {
       }
     }
 
+    console.log('2');
     // tally up points for each contenderId. this is used to sort the contenders
     const pointsPerContenderId: { [contenderId: string]: number } = {};
     for (const categoryName of Object.keys(categories)) {
+      if (!numPredicting[categoryName]) continue;
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
         pointsPerContenderId[contenderId] = getContenderPoints(rankings);
       }
     }
+    console.log('3');
     const sortedContenderIds = Object.entries(pointsPerContenderId)
       .sort(([, a], [, b]) => {
         // this will sort so the largest number comes first in the list
@@ -113,6 +123,7 @@ export const handler = dbWrapper(async ({ db }) => {
       })
       .map(([contenderId]) => contenderId);
 
+    console.log('4');
     // format the "categories" field on PredictionSet
     const categoryPredictions: {
       [categoryName: string]: iCategoryPrediction;
@@ -120,6 +131,7 @@ export const handler = dbWrapper(async ({ db }) => {
     for (const [categoryName, { type, phase }] of Object.entries(categories)) {
       // we need numPredicting amount of predictions for each category
       const predictions: iPredictions = [];
+      if (!numPredicting[categoryName]) continue;
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
@@ -140,6 +152,7 @@ export const handler = dbWrapper(async ({ db }) => {
       };
     }
 
+    console.log('5');
     // if any shortlist is happening today, we need to know so we can write to tomorrow's predictions
     // see POST:predictionset for why
     const maybeShortlistDateTimeHappeningToday = Object.values(categories)
@@ -149,6 +162,7 @@ export const handler = dbWrapper(async ({ db }) => {
           shortlistDateTime && yyyymmdd === dateToYyyymmdd(shortlistDateTime)
       );
 
+    console.log('6');
     // get the day we should log this predictionset as
     const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
       nomDateTime,
@@ -157,41 +171,22 @@ export const handler = dbWrapper(async ({ db }) => {
       ? tomorrowYyyymmdd
       : todayYyyymmdd;
 
-    // get most recent
-    const mostRecentPredictionSet = await db
-      .collection<PredictionSet>('predictionsets')
-      .findOne(
-        { userId: COMMUNITY_USER_ID, eventId: new ObjectId(eventId) },
-        { sort: { yyyymmdd: -1 } }
-      );
-
-    const isNewDate =
-      mostRecentPredictionSet && yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
-
-    // create predictionset this is the first for the event, or the first on this date
-    if (!mostRecentPredictionSet || isNewDate) {
-      await db.collection<PredictionSet>('predictionsets').insertOne({
+    // upsert the predictionset - will create new if it's a new day
+    await db.collection<PredictionSet>('predictionsets').findOneAndUpdate(
+      {
         userId: COMMUNITY_USER_ID,
         eventId: new ObjectId(eventId),
-        yyyymmdd,
-        // @ts-expect-error - This should only have partial data
-        categories: categoryPredictions
-      });
-      // else if predictionset exists for event, update it
-    } else {
-      // update the current prediction set
-      await db.collection<PredictionSet>('predictionsets').updateOne(
-        // @ts-expect-error - this particular ID is a string
-        { _id: COMMUNITY_USER_ID },
-        {
-          $set: {
-            categories: categoryPredictions
-          }
-        }
-      );
-    }
+        yyyymmdd
+      },
+      {
+        // @ts-expect-error - allowing this to be partial
+        $set: { categories: categoryPredictions }
+      },
+      { upsert: true }
+    );
   }
 
+  console.log('done!');
   return {
     statusCode: 200
   };
