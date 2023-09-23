@@ -60,7 +60,7 @@ export function ApiStack({ stack }: StackContext) {
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
-      "DELETE /relationships": `${PATH}/relationship.remove`,
+      "DELETE /relationships/{followedUserId}": `${PATH}/relationship.remove`,
       "DELETE /tokens/{token}": `${PATH}/token.remove`, // delete token
       "DELETE /tokens/user": `${PATH}/token.removeUserTokens`, // delete tokens associated with user
     },
