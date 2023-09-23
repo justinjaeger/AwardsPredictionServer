@@ -1,13 +1,11 @@
 import { type Filter } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
-import { type AwardsBody } from './types/enums';
 
 // TODO: untested
-export const list = dbWrapper<
-  { maxYear?: number; minYear?: number; awardsBody?: AwardsBody },
-  Event[]
->(async ({ db, params }) => {
-  const { maxYear, minYear, awardsBody } = params;
+export const list = dbWrapper<undefined, Event[]>(async ({ db, params }) => {
+  const { awardsBody } = params;
+  const maxYear = params.maxYear ? parseInt(params.maxYear) : undefined;
+  const minYear = params.minYear ? parseInt(params.minYear) : undefined;
   const filter: Filter<Event> = {};
   if (maxYear ?? minYear) {
     filter.year = {};
