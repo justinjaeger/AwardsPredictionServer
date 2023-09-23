@@ -38,7 +38,7 @@ export const send = dbWrapper<{ email: string }, string>(
  * Note: client must verify that the payload email matches the email the person is trying to verify
  * link looks like: oscar://signin/?token={jwt}&email={email")
  */
-export const verify = dbWrapper<{ link: string }>(
+export const verify = dbWrapper<{ link: string }, string>(
   async ({ params: { link } }) => {
     if (!link) {
       return {
@@ -61,7 +61,8 @@ export const verify = dbWrapper<{ link: string }>(
       };
     } else {
       return {
-        statusCode: 200
+        statusCode: 200,
+        data: email
       };
     }
   }
