@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type RelationshipWithUser,
@@ -184,12 +184,19 @@ export const listFollowers = dbWrapper<
 
 export const post = dbWrapper<
   { email: string; name?: string; username?: string },
-  string // returns the user id
+  WithId<User> // returns the user id
 >(async ({ db, payload }) => {
-  const user = await db.collection<User>('users').insertOne(payload);
+  const res = await db.collection<User>('users').insertOne(payload);
+  const userId = res.insertedId.toString();
+  const user = await db
+    .collection<User>('users')
+    .findOne({ _id: new ObjectId(userId) });
+  if (!user) {
+    return SERVER_ERROR.Error;
+  }
   return {
     statusCode: 200,
-    data: user.insertedId.toString()
+    data: user
   };
 });
 
