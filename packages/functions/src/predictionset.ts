@@ -29,10 +29,7 @@ import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsT
  * If categoryName is provided, only return that category
  * // TODO: untested
  */
-export const get = dbWrapper<
-  { yyyymmdd: number; categoryName?: CategoryName },
-  PredictionSet
->(
+export const get = dbWrapper<undefined, PredictionSet>(
   async ({
     db,
     params: { userId, eventId, yyyymmdd: yyyymmddString, categoryName }
