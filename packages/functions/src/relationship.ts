@@ -41,7 +41,7 @@ export const post = dbWrapper<
 });
 
 export const remove = dbWrapper<{ followedUserId: string }, {}>(
-  async ({ db, payload: { followedUserId }, authenticatedUserId }) => {
+  async ({ db, params: { followedUserId }, authenticatedUserId }) => {
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthenticated;
     }

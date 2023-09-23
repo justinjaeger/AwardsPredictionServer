@@ -43,7 +43,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /tokens": `${PATH}/token.get`, // uses payload from refreshToken
       "GET /predictionsets/{userId}/event/{eventId}": `${PATH}/predictionset.get`, // returns Predictionset
       "GET /events": `${PATH}/event.list`,
-      "GET /categoryupdatelogs": `${PATH}/categoryupdatelogs.get`,
+      "GET /categoryupdatelogs/{userId}/{eventId}": `${PATH}/categoryupdatelogs.get`,
       "GET /jwt": `${PATH}/jwt.get`,
       "GET /email/send": `${PATH}/email.send`,
       "GET /email/verify": `${PATH}/email.verify`,
@@ -60,8 +60,9 @@ export function ApiStack({ stack }: StackContext) {
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
-      "DELETE /relationships": `${PATH}/relationship.remove`,
-      "DELETE /tokens": `${PATH}/token.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
+      "DELETE /relationships/{followedUserId}": `${PATH}/relationship.remove`,
+      "DELETE /tokens/{token}": `${PATH}/token.remove`, // delete token
+      "DELETE /tokens/user": `${PATH}/token.removeUserTokens`, // delete tokens associated with user
     },
   });
 

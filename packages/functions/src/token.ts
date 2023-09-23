@@ -69,29 +69,48 @@ export const post = dbWrapper<{}, string>(
 );
 
 /**
- * Deletes a refresh token if token is passed
- * Deletes all user tokens if userId is passed
+ * Deletes a single refresh token (used on log out)
  */
-export const remove = dbWrapper<{ token: string }, string>(
-  async ({ db, payload: { token }, authenticatedUserId: userId }) => {
+export const remove = dbWrapper<undefined, string>(
+  async ({ db, params: { token }, authenticatedUserId: userId }) => {
     if (!userId) {
       return SERVER_ERROR.Unauthenticated;
     }
 
-    const tokens = db.collection<Token>('tokens');
-
-    if (!token && !userId) {
+    if (!token) {
       return {
         ...SERVER_ERROR.BadRequest,
-        message: 'Missing body properties'
+        message: 'Missing path property: token'
       };
     }
 
-    if (token) {
-      await tokens.deleteOne({ token });
-    } else if (userId) {
-      await tokens.deleteMany({ userId: new ObjectId(userId) });
+    const tokens = db.collection<Token>('tokens');
+
+    await tokens.deleteOne({ token });
+
+    return { statusCode: 200 };
+  }
+);
+
+/**
+ * Deletes all user tokens associated with authed user
+ */
+export const removeUserTokens = dbWrapper<undefined, string>(
+  async ({ db, authenticatedUserId: userId }) => {
+    if (!userId) {
+      return SERVER_ERROR.Unauthenticated;
     }
+
+    if (!userId) {
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: 'Missing path property: userId'
+      };
+    }
+
+    const tokens = db.collection<Token>('tokens');
+
+    await tokens.deleteMany({ userId: new ObjectId(userId) });
 
     return { statusCode: 200 };
   }
