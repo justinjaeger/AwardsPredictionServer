@@ -4,7 +4,6 @@ import { type Song } from './types/models';
 
 /**
  * Gets a batch of song data,
- * which is updated behind the scenes from tmdb
  * Fake POST request so I can use the body
  */
 export const getBatch = dbWrapper<string[], Record<string, Song>>(
