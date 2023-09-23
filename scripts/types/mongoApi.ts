@@ -127,16 +127,6 @@ export type MongoEventModel = {
   amplify_id?: string;
 }
 
-export type MongoIMovieCategoryCredit =
-  | "directing"
-  | "screenplay"
-  | "cinematography"
-  | "costumes"
-  | "editing"
-  | "productionDesign"
-  | "score"
-  | "vfx";
-
 export type IMovieCategoryCredit =
   | 'directing'
   | 'screenplay'
@@ -178,12 +168,6 @@ export type iPredictions = Array<{
   numPredicting?: Record<number, number>; // only applies to community predictions
 }>;
 
-export type MongoiCategoryPrediction = {
-  type: CategoryType;
-  createdAt: Date;
-  predictions: iPredictions;
-  phase?: Phase | undefined;
-};
 
 export type iCategoryPrediction = {
   type: CategoryType;
