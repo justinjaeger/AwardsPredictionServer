@@ -7,7 +7,7 @@ import {
 } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
-  type iPredictions,
+  type iPrediction,
   type EventModel,
   type PredictionSet,
   type User,
@@ -78,7 +78,7 @@ export const post = dbWrapper<
   {
     eventId: string;
     categoryName: CategoryName;
-    predictions: iPredictions; // user passes all predictions with request
+    predictions: iPrediction[]; // user passes all predictions with request
   },
   {}
 >(

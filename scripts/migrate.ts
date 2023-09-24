@@ -15,7 +15,8 @@ import {
 import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
 import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
-import { CategoryName, CategoryType, MongoContender, MongoEventModel, MongoMovie, MongoPerson, MongoPredictionSet, MongoRelationship, MongoSong, MongoUser, iMongoCategories, iRecentPredictions } from "types/mongoApi.ts";
+import { CategoryName, CategoryType } from "types/enums.ts";
+import { Contender, EventModel, Movie, Person, PredictionSet, Relationship, Song, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
 
 /**
  * Documentation, all dynamodb commands:
@@ -131,15 +132,18 @@ async function handler() {
     const predictionSetItems = await getTableItems<AmplifyPredictionSet>(predictionSetTable) // 3856 but is actually 12,274
 
     // CATEGORIES
-    const amplifyEventIdToMongoCategories: {[amplifyEventId: string]: iMongoCategories} = {};
+    const amplifyEventIdToMongoCategories: {[amplifyEventId: string]: Record<CategoryName, iCategory>} = {};
     const amplifyCategoryIdToCategory: {[amplifyCategoryId: string]: { type: CategoryType, name: CategoryName }} = {};
     for (const amplifyCategory of categoryItems) {
         if (!amplifyEventIdToMongoCategories[amplifyCategory.eventId]) {
             //@ts-ignore - allow categories to be partially filled out
             amplifyEventIdToMongoCategories[amplifyCategory.eventId] = {}
-        }const type = amplifyCategoryTypeToMongoCategoryType(amplifyCategory.type);
-        amplifyEventIdToMongoCategories[amplifyCategory.eventId][amplifyCategory.name] = {
+        }
+        const type = amplifyCategoryTypeToMongoCategoryType(amplifyCategory.type);
+        const name = amplifyCategoryNameToMongoCategoryName(amplifyCategory.name);
+        amplifyEventIdToMongoCategories[amplifyCategory.eventId][name] = {
             type,
+            name,
         };
         amplifyCategoryIdToCategory[amplifyCategory.id] = {
             type,
@@ -150,16 +154,16 @@ async function handler() {
     // console.log('amplifyEventIdToMongoCategories',amplifyEventIdToMongoCategories)
 
     const amplifyEventIdToMongoEventId: {[amplifyEventId: string]: ObjectId} = {};
-    const amplifyEventIdToMongoEvent: {[amplifyEventId: string]: MongoEventModel} = {};
+    const amplifyEventIdToMongoEvent: {[amplifyEventId: string]: EventModel} = {};
 
     // EVENTS
     for (const amplifyEvent of eventItems) {
         const amplify_id = amplifyEvent.id;
-        const mongoEvent = {
+        const mongoEvent: EventModel = {
             ...convertEvent(amplifyEvent),
             categories: amplifyEventIdToMongoCategories[amplify_id],
         };
-        const res = await mongodb.collection<MongoEventModel>('events').findOneAndUpdate(
+        const res = await mongodb.collection<EventModel>('events').findOneAndUpdate(
             { amplify_id },
             { $set: mongoEvent },
             { upsert: true }
@@ -190,13 +194,13 @@ async function handler() {
     // }
 
     // USERS (part one)
-    const userReqs: Promise<ModifyResult<MongoUser>>[] = [];
+    const userReqs: Promise<ModifyResult<User>>[] = [];
     for (const amplifyUser of userItems) {
         const mongoUser = convertUser(amplifyUser);
         const amplify_id = amplifyUser.id;
 
         userReqs.push(
-            mongodb.collection<MongoUser>('users').findOneAndUpdate(
+            mongodb.collection<User>('users').findOneAndUpdate(
                 { amplify_id },
                 { $set: mongoUser },
                 { upsert: true }
@@ -218,7 +222,7 @@ async function handler() {
     }
 
     // RELATIONSHIPS
-    const relationshipReqs: Promise<ModifyResult<MongoRelationship>>[] = [];
+    const relationshipReqs: Promise<ModifyResult<Relationship>>[] = [];
     // to help not push duplicates:
     const seenRelationships: {[key: string]: boolean} = {};
     for (const amplifyRelationship of relationshipItems) {
@@ -231,7 +235,7 @@ async function handler() {
         } 
         seenRelationships[`${amplifyFollowingUserId}-${amplifyFollowedUserId}`] = true;
         relationshipReqs.push(
-            mongodb.collection<MongoRelationship>('relationships').findOneAndUpdate(
+            mongodb.collection<Relationship>('relationships').findOneAndUpdate(
                 { amplify_id },
                 { $set: {
                     followingUserId: amplifyUserIdToData[amplifyFollowingUserId].mongoId,
@@ -252,11 +256,11 @@ async function handler() {
     const amplifyMoviePersonOrSongToMongoId: {[amplifyId: string]: ObjectId} = {};
 
     // MOVIES
-    const movieReqs: Promise<ModifyResult<MongoMovie>>[] = [];
+    const movieReqs: Promise<ModifyResult<Movie>>[] = [];
     for (const amplifyMovie of movieItems) {
         const amplify_id = amplifyMovie.id;
         movieReqs.push(
-            mongodb.collection<MongoMovie>('movies').findOneAndUpdate(
+            mongodb.collection<Movie>('movies').findOneAndUpdate(
                 { amplify_id },
                 { $set: convertMovie(amplifyMovie) },
                 { upsert: true }
@@ -273,11 +277,11 @@ async function handler() {
     }
 
     // PERSONS
-    const personReqs: Promise<ModifyResult<MongoPerson>>[] = [];
+    const personReqs: Promise<ModifyResult<Person>>[] = [];
     for (const amplifyPerson of personItems) {
         const amplify_id = amplifyPerson.id;
         personReqs.push(
-            mongodb.collection<MongoPerson>('persons').findOneAndUpdate(
+            mongodb.collection<Person>('persons').findOneAndUpdate(
                 { amplify_id },
                 { $set: convertPerson(amplifyPerson) },
                 { upsert: true }
@@ -294,12 +298,12 @@ async function handler() {
     }
 
     // SONGS
-    const songReqs: Promise<ModifyResult<MongoSong>>[] = [];
+    const songReqs: Promise<ModifyResult<Song>>[] = [];
     for (const amplifySong of songItems) {
         const amplify_id = amplifySong.id;
         const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifySong.movieId];
         songReqs.push(
-            mongodb.collection<MongoSong>('songs').findOneAndUpdate(
+            mongodb.collection<Song>('songs').findOneAndUpdate(
                 { amplify_id },
                 { $set: convertSong(amplifySong, mongoMovieId) },
                 { upsert: true }
@@ -317,8 +321,8 @@ async function handler() {
 
     // CONTENDERS
     const amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId} = {};
-    const amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: MongoContender} = {};
-    const contenderReqs: Promise<ModifyResult<MongoContender>>[] = [];
+    const amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: Contender} = {};
+    const contenderReqs: Promise<ModifyResult<Contender>>[] = [];
     for (const amplifyContender of contenderItems) {
         const amplify_id = amplifyContender.id;
         const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifyContender.movieId];
@@ -328,7 +332,7 @@ async function handler() {
         const personId = amplifyContender.personId && amplifyMoviePersonOrSongToMongoId[amplifyContender.personId] || undefined;
         const mongoContender = convertContender(amplifyContender, mongoMovieId, mongoEventId, categoryName, songId, personId);
         contenderReqs.push(
-            mongodb.collection<MongoContender>('contenders').findOneAndUpdate(
+            mongodb.collection<Contender>('contenders').findOneAndUpdate(
                 { amplify_id },
                 { $set: mongoContender },
                 { upsert: true }
@@ -355,8 +359,8 @@ async function handler() {
         const amplifyEventId = amplifyEvent.id;
         const mongoDbEventId = amplifyEventIdToMongoEventId[amplifyEvent.id];
 
-        const amplifyIdToMongoPredictionSet: {[amplifyId: string]: MongoPredictionSet} = {};
-        const predictionSetReqs: Promise<ModifyResult<MongoPredictionSet> | void>[] = [];
+        const amplifyIdToMongoPredictionSet: {[amplifyId: string]: PredictionSet} = {};
+        const predictionSetReqs: Promise<ModifyResult<PredictionSet> | void>[] = [];
         for (const amplifyUser of userItems) {
             const amplifyUserId = amplifyUser.id;
             const mongoDbUserId = amplifyUserIdToData[amplifyUserId].mongoId;
@@ -380,7 +384,7 @@ async function handler() {
             // and yesterday's were broken.
             // So we should delete all in the table, before running this again
             predictionSetReqs.push(
-                mongodb.collection<MongoPredictionSet>('predictionsets').findOneAndUpdate(
+                mongodb.collection<PredictionSet>('predictionsets').findOneAndUpdate(
                     { userId: mongoDbUserId, eventId: mongoDbEventId, yyyymmdd: mongoDbPredictionSet.yyyymmdd },
                     { $set: mongoDbPredictionSet },
                     { upsert: true }
@@ -401,7 +405,7 @@ async function handler() {
             const mongoDbPredictionSet = amplifyIdToMongoPredictionSet[amplifyUserId];
             const iterableCategories = Object.entries(mongoDbPredictionSet.categories);
             iterableCategories.sort(([,p1], [,p2])=>p1.createdAt.getTime() - p2.createdAt.getTime());
-            const fiveMostRecentPredictions: iRecentPredictions = iterableCategories.slice(0,5).map(([categoryName, category])=>{
+            const fiveMostRecentPredictions: iRecentPrediction[] = iterableCategories.slice(0,5).map(([categoryName, category])=>{
                 const { awardsBody, year } = amplifyEventIdToMongoEvent[amplifyEventId];
                 return {
                     awardsBody,
@@ -416,7 +420,7 @@ async function handler() {
             const followingCount = amplifyUserIdToData[amplifyUserId].followingCount;
             const followerCount = amplifyUserIdToData[amplifyUserId].followerCount;
             userNestedFieldReqs.push(
-                mongodb.collection<MongoUser>('users').updateOne(
+                mongodb.collection<User>('users').updateOne(
                     { _id: mongoDbUserId },
                     { $set: { 
                         recentPredictions: fiveMostRecentPredictions,

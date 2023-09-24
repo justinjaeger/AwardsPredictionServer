@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { AmplifyAwardsBody, AmplifyCategoryName, AmplifyCategoryType, AmplifyContender, AmplifyContenderVisibility, AmplifyEvent, AmplifyEventStatus, AmplifyMovie, AmplifyPerson, AmplifyPrediction, AmplifyPredictionSet, AmplifySong, AmplifyUser, AmplifyUserRole } from "../types/amplifyApi.ts";
-import { AwardsBody, CategoryName, CategoryType, EventStatus, MongoContender, MongoEventModel, MongoMovie, MongoPredictionSet, MongoRelationship, MongoSong, MongoUser, UserRole, iCategoryPrediction } from "../types/mongoApi.ts";
+import { AwardsBody, CategoryName, CategoryType, Contender, EventModel, EventStatus, Movie, Person, PredictionSet, Relationship, Song, User, UserRole, iCategoryPrediction } from "../types/mongoApi.ts";
 
 export const amplifyRoleToMongoRole = (role: AmplifyUserRole): UserRole => {
     switch (role) {
@@ -32,8 +32,8 @@ export const amplifyCategoryNameToMongoCategoryName = (type: AmplifyCategoryName
 // I have to create user FIRST, so how am I going to get the predictionsets first? It's circular
 export const convertUser = (
     user: AmplifyUser,
-): MongoUser => {
-    const obj: MongoUser = {
+): User => {
+    const obj: User = {
         amplify_id: user.id,
         email: user.email,
         name: user.name || undefined,
@@ -46,22 +46,9 @@ export const convertUser = (
     return obj;
 }
 
-export const convertRelationship = (
-    amplifyRelationshipId: string,
-    mongoFollowedUserId: ObjectId, // have to get this first
-    mongoFollowingUserId: ObjectId
-
-): MongoRelationship => {
-    return {
-        amplify_id: amplifyRelationshipId,
-        followedUserId: mongoFollowedUserId,
-        followingUserId: mongoFollowingUserId,
-    }
-}
-
 export const convertEvent = (
     amplifyEvent: AmplifyEvent,
-): MongoEventModel => {
+): EventModel => {
     return {
         amplify_id: amplifyEvent.id,
         awardsBody: amplifyAwardsBodyToMongoAwardsBody(amplifyEvent.awardsBody),
@@ -79,7 +66,7 @@ export const convertEvent = (
 // Movie, Person, the cron func fills in the rest of the info
 export const convertMovie = (
     amplifyMovie: AmplifyMovie,
-): MongoMovie => {
+): Movie => {
     return {
         amplify_id: amplifyMovie.id,
         tmdbId: amplifyMovie.tmdbId,
@@ -89,7 +76,7 @@ export const convertMovie = (
 }
 export const convertPerson = (
     amplifyPerson: AmplifyPerson,
-): MongoMovie => {
+): Person => {
     return {
         amplify_id: amplifyPerson.id,
         tmdbId: amplifyPerson.tmdbId,
@@ -101,7 +88,7 @@ export const convertPerson = (
 export const convertSong = (
     amplifySong: AmplifySong,
     mongoMovieId: ObjectId,
-): MongoSong => {
+): Song => {
     return {
         amplify_id: amplifySong.id,
         title: amplifySong.title,
@@ -117,7 +104,7 @@ export const convertContender = (
     categoryName: CategoryName,
     songId?: ObjectId,
     personId?: ObjectId,
-): MongoContender => {
+): Contender => {
     const isHidden = amplifyContender.visibility === AmplifyContenderVisibility.HIDDEN ? true : false;
     return {
         amplify_id: amplifyContender.id,
@@ -143,8 +130,8 @@ export const convertPredictionSet = (
     mongoEventId: ObjectId,
     amplifyCategoryIdToCategory: {[amplifyCategoryId: string]: { type: CategoryType, name: CategoryName }},
     amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId},
-    amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: MongoContender},
-): MongoPredictionSet => {
+    amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: Contender},
+): PredictionSet => {
     let latestYyyymmdd = 0;
     // creates the categories object on the predictionset
     const categories = amplifyPredictionSets.reduce((acc, predictionSet)=>{
@@ -164,7 +151,6 @@ export const convertPredictionSet = (
             }
         })
         acc[name] = {
-            type: type,
             createdAt: new Date(predictionSet.createdAt),
             predictions,
         }
