@@ -40,8 +40,11 @@ export interface EventModel {
     CategoryName,
     {
       type: CategoryType;
+      name: string;
+      slots?: number; // 5 by default
       phase?: Phase;
       shortlistDateTime?: Date;
+      hideUntilShortlisted?: boolean;
     }
   >;
   awardsBody: AwardsBody;
