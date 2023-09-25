@@ -404,7 +404,8 @@ async function handler() {
             const predictionSetId = getResId(res);
             const mongoDbPredictionSet = amplifyIdToMongoPredictionSet[amplifyUserId];
             const iterableCategories = Object.entries(mongoDbPredictionSet.categories);
-            iterableCategories.sort(([,p1], [,p2])=>p1.createdAt.getTime() - p2.createdAt.getTime());
+            // NOTE: this should be, most recent at the FRONT, least at the BACK
+            iterableCategories.sort(([,p1], [,p2]) => p2.createdAt.getTime() - p1.createdAt.getTime());
             const fiveMostRecentPredictions: iRecentPrediction[] = iterableCategories.slice(0,5).map(([categoryName, category])=>{
                 const { awardsBody, year } = amplifyEventIdToMongoEvent[amplifyEventId];
                 return {
@@ -413,7 +414,8 @@ async function handler() {
                     category: categoryName,
                     predictionSetId,
                     createdAt: category.createdAt,
-                    topPredictions: category.predictions.slice(0,5),
+                    // NOTE: this should be, highest ranked at the FRONT, least at the BACK
+                    topPredictions: category.predictions.sort((a, b) => a.ranking - b.ranking).slice(0,5),
                 }
             })
             const eventsPredicting = fiveMostRecentPredictions.length > 0 ? [mongoDbEventId] : [];
@@ -423,7 +425,7 @@ async function handler() {
                 mongodb.collection<User>('users').updateOne(
                     { _id: mongoDbUserId },
                     { $set: { 
-                        recentPredictions: fiveMostRecentPredictions,
+                        recentPredictionSets: fiveMostRecentPredictions,
                         eventsPredicting,
                         followingCount,
                         followerCount,

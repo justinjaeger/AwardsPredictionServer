@@ -228,6 +228,7 @@ export const post = dbWrapper<
         { projection: { recentPredictionSets: 1 } }
       );
     const userRecentPredictionSets = user?.recentPredictionSets ?? [];
+    // note: The TOP predictions should be at the FRONT of the array
     userRecentPredictionSets.unshift({
       awardsBody,
       year,
@@ -235,7 +236,7 @@ export const post = dbWrapper<
       createdAt: new Date(),
       predictionSetId: new ObjectId(),
       topPredictions: predictions
-        .sort((a, b) => b.ranking - a.ranking)
+        .sort((a, b) => a.ranking - b.ranking)
         .slice(0, 5)
     });
     if (userRecentPredictionSets?.length > RECENT_PREDICTION_SETS_TO_SHOW) {
