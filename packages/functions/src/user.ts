@@ -91,13 +91,17 @@ export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
       userId,
       limit: limitAsString,
       pageNumber: pageNumberAsString,
-      includeRecentPredictionSets
+      includeRecentPredictionSets: includeRecentPredictionSetsAsString,
+      disablePagination: disablePaginationAsString
     }
   }) => {
     const limit = limitAsString ? parseInt(limitAsString) : undefined;
     const pageNumber = pageNumberAsString
       ? parseInt(pageNumberAsString)
       : undefined;
+    const includeRecentPredictionSets =
+      includeRecentPredictionSetsAsString === 'true';
+    const disablePagination = disablePaginationAsString === 'true';
 
     if (!userId) {
       return SERVER_ERROR.BadRequest;
@@ -114,7 +118,7 @@ export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
         {
           $project: { _id: 0, followedUserId: 1 }
         },
-        ...getAggregatePagination(pageNumber, limit),
+        ...getAggregatePagination(pageNumber, limit, disablePagination),
         {
           $lookup: {
             from: 'users',

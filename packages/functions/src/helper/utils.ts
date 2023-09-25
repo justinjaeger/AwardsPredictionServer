@@ -12,8 +12,14 @@ export const paginateCursor = (
 
 export const getAggregatePagination = (
   pageNumber: number = 1,
-  limit: number = DEFAULT_PAGINATE_LIMIT
-): Document[] => [{ $skip: (pageNumber - 1) * limit }, { $limit: limit }];
+  limit: number = DEFAULT_PAGINATE_LIMIT,
+  disablePagination?: boolean
+): Document[] => {
+  if (disablePagination) {
+    return [];
+  }
+  return [{ $skip: (pageNumber - 1) * limit }, { $limit: limit }];
+};
 
 export const dateToYyyymmdd = (date: Date) => {
   return parseInt(
