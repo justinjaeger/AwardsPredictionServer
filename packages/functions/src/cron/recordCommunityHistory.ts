@@ -10,7 +10,7 @@ import {
   type iCategoryPrediction,
   type EventModel,
   type PredictionSet,
-  type iPredictions
+  type iPrediction
 } from 'src/types/models';
 
 /**
@@ -128,9 +128,9 @@ export const handler = dbWrapper(async ({ db }) => {
     const categoryPredictions: {
       [categoryName: string]: iCategoryPrediction;
     } = {};
-    for (const [categoryName, { type, phase }] of Object.entries(categories)) {
+    for (const categoryName of Object.keys(categories)) {
       // we need numPredicting amount of predictions for each category
-      const predictions: iPredictions = [];
+      const predictions: iPrediction[] = [];
       if (!numPredicting[categoryName]) continue;
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
@@ -145,8 +145,6 @@ export const handler = dbWrapper(async ({ db }) => {
         });
       }
       categoryPredictions[categoryName] = {
-        type,
-        phase,
         createdAt: new Date(),
         predictions
       };
