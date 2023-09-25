@@ -84,19 +84,21 @@ export const search = dbWrapper<
  * I can include includeRecentPredictionSets.
  * Otherwise, I'll just basic information on who user is following.
  */
-export const listFollowings = dbWrapper<
-  {
-    limit?: number;
-    pageNumber?: number;
-    includeRecentPredictionSets?: boolean;
-  },
-  Array<Partial<User>>
->(
+export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
   async ({
     db,
-    params: { userId },
-    payload: { limit, pageNumber, includeRecentPredictionSets }
+    params: {
+      userId,
+      limit: limitAsString,
+      pageNumber: pageNumberAsString,
+      includeRecentPredictionSets
+    }
   }) => {
+    const limit = limitAsString ? parseInt(limitAsString) : undefined;
+    const pageNumber = pageNumberAsString
+      ? parseInt(pageNumberAsString)
+      : undefined;
+
     if (!userId) {
       return SERVER_ERROR.BadRequest;
     }
@@ -139,48 +141,55 @@ export const listFollowings = dbWrapper<
   }
 );
 
-export const listFollowers = dbWrapper<
-  { limit?: number; pageNumber?: number },
-  Array<Partial<User>>
->(async ({ db, params: { userId }, payload: { limit, pageNumber } }) => {
-  if (!userId) {
-    return SERVER_ERROR.BadRequest;
+export const listFollowers = dbWrapper<undefined, Array<Partial<User>>>(
+  async ({
+    db,
+    params: { userId, limit: limitAsString, pageNumber: pageNumberAsString }
+  }) => {
+    const limit = limitAsString ? parseInt(limitAsString) : undefined;
+    const pageNumber = pageNumberAsString
+      ? parseInt(pageNumberAsString)
+      : undefined;
+
+    if (!userId) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const followedUsers = await db
+      .collection<Relationship>('relationships')
+      .aggregate<RelationshipWithUser>([
+        {
+          $match: {
+            followedUserId: new ObjectId(userId)
+          }
+        },
+        ...getAggregatePagination(pageNumber, limit),
+        {
+          $project: { _id: 0, followingUserId: 1 }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followingUserId',
+            foreignField: '_id',
+            as: 'followingUserList',
+            pipeline: [
+              {
+                $project: { username: 1, name: 1, image: 1 }
+              }
+            ]
+          }
+        }
+      ])
+      .map(({ followingUserList }) => followingUserList[0])
+      .toArray();
+
+    return {
+      statusCode: 200,
+      data: followedUsers
+    };
   }
-
-  const followedUsers = await db
-    .collection<Relationship>('relationships')
-    .aggregate<RelationshipWithUser>([
-      {
-        $match: {
-          followedUserId: new ObjectId(userId)
-        }
-      },
-      ...getAggregatePagination(pageNumber, limit),
-      {
-        $project: { _id: 0, followingUserId: 1 }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'followingUserId',
-          foreignField: '_id',
-          as: 'followingUserList',
-          pipeline: [
-            {
-              $project: { username: 1, name: 1, image: 1 }
-            }
-          ]
-        }
-      }
-    ])
-    .map(({ followingUserList }) => followingUserList[0])
-    .toArray();
-
-  return {
-    statusCode: 200,
-    data: followedUsers
-  };
-});
+);
 
 export const post = dbWrapper<
   { email: string; name?: string; username?: string },
