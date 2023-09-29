@@ -111,13 +111,11 @@ export const post = dbWrapper<
         message: `Category ${categoryName} not found on event`
       };
     }
-    const { awardsBody, year, nomDateTime, winDateTime, status } = event;
+    const { awardsBody, year, nomDateTime } = event;
     const { type: categoryType, shortlistDateTime } = category;
 
     const phaseUserIsPredicting = getPhaseUserIsPredicting(
-      status,
-      nomDateTime,
-      winDateTime,
+      event,
       shortlistDateTime
     );
 
