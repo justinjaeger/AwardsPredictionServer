@@ -116,17 +116,36 @@ export const post = dbWrapper<
       shortlistDateTime
     } = category;
 
-    // winDateTime is when we close predictions for the winner ceremony
-    if (winDateTime && winDateTime < new Date()) {
+    const shortlistDateHasPassed = !!(
+      shortlistDateTime && shortlistDateTime < new Date()
+    );
+    const nomDateHasPassed = !!(nomDateTime && nomDateTime < new Date());
+    const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
+
+    /**
+     * A category or event phase goes from null to shortlist to nomination to winner to closed
+     * null/undefined is when you can predict shotlist OR noms depending
+     * shortlist is WHEN YOU CAN PREDICT shortlist
+     * nomination is WHEN YOU CAN PREDICT nomination
+     * winner is WHEN YOU CAN PREDICT winner
+     * closed is WHEN YOU CAN'T PREDICT ANYMORE
+     */
+    if (winDateHasPassed || categoryPhase === Phase.CLOSED) {
       return {
         ...SERVER_ERROR.BadRequest,
-        message: `Final predictions have ended. Pencils down!`
+        message: `Event is closed for predictions.`
       };
     }
-    if (categoryPhase === Phase.CLOSED) {
+    if (nomDateHasPassed && categoryPhase !== Phase.WINNER) {
       return {
         ...SERVER_ERROR.BadRequest,
-        message: `Category is closed for predictions while leaderboards are compiled.`
+        message: `Event is closed for predictions while nominations occur.`
+      };
+    }
+    if (shortlistDateHasPassed && categoryPhase !== Phase.NOMINATION) {
+      return {
+        ...SERVER_ERROR.BadRequest,
+        message: `Category is closed for predictions while shortlist is compiled.`
       };
     }
 
