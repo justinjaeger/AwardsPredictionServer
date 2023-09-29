@@ -12,9 +12,9 @@ import {
   type PredictionSet,
   type User,
   type CategoryUpdateLog,
-  EventStatus
+  type CategoryName,
+  Phase
 } from './types/models';
-import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
 import { dateToYyyymmdd, getDate } from './helper/utils';
 import {
@@ -22,6 +22,7 @@ import {
   RECENT_PREDICTION_SETS_TO_SHOW
 } from './helper/constants';
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
+import { getPhaseUserIsPredicting } from './helper/getPhaseUserIsPredicting';
 
 /**
  * Get the most recent predictionset if yyyymmdd is not provided
@@ -111,30 +112,14 @@ export const post = dbWrapper<
       };
     }
     const { awardsBody, year, nomDateTime, winDateTime, status } = event;
-    const {
-      type: categoryType,
-      phase: categoryPhase,
-      shortlistDateTime
-    } = category;
+    const { type: categoryType, shortlistDateTime } = category;
 
-    const shortlistDateHasPassed = !!(
-      shortlistDateTime && shortlistDateTime < new Date()
+    const phaseUserIsPredicting = getPhaseUserIsPredicting(
+      status,
+      nomDateTime,
+      winDateTime,
+      shortlistDateTime
     );
-    const nomDateHasPassed = !!(nomDateTime && nomDateTime < new Date());
-    const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
-    const canPredictWinners =
-      !winDateHasPassed && status === EventStatus.WINS_LIVE;
-    const canPredictNominations =
-      !nomDateHasPassed && status === EventStatus.NOMS_LIVE;
-    const canPredictShortlist =
-      !shortlistDateHasPassed && status === EventStatus.NOMS_LIVE;
-    const phaseUserIsPredicting = canPredictWinners
-      ? Phase.WINNER
-      : canPredictShortlist
-      ? Phase.SHORTLIST
-      : canPredictNominations
-      ? Phase.NOMINATION
-      : Phase.CLOSED;
 
     if (phaseUserIsPredicting === Phase.CLOSED) {
       return {
@@ -181,7 +166,7 @@ export const post = dbWrapper<
             categories: {
               [categoryName]: {
                 type: categoryType,
-                phase: categoryPhase,
+                phase: phaseUserIsPredicting,
                 createdAt: new Date(),
                 predictions
               }
@@ -204,7 +189,7 @@ export const post = dbWrapper<
                 ...mostRecentPredictionSet.categories,
                 [categoryName]: {
                   type: categoryType,
-                  phase: categoryPhase,
+                  phase: phaseUserIsPredicting,
                   createdAt: new Date(),
                   predictions
                 }
@@ -222,7 +207,7 @@ export const post = dbWrapper<
               $set: {
                 [`categories.$.${categoryName}`]: {
                   type: categoryType,
-                  phase: categoryPhase,
+                  phase: phaseUserIsPredicting,
                   createdAt: new Date(),
                   predictions
                 }
