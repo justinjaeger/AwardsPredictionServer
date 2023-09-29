@@ -1,29 +1,47 @@
 import { type Filter } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type AwardsBody } from './types/enums';
+import { EventStatus, type EventModel } from './types/models';
 
 // TODO: untested
-export const list = dbWrapper<
-  { maxYear?: number; minYear?: number; awardsBody?: AwardsBody },
-  Event[]
->(async ({ db, params }) => {
-  const { maxYear, minYear, awardsBody } = params;
-  const filter: Filter<Event> = {};
-  if (maxYear ?? minYear) {
-    filter.year = {};
-    if (maxYear) {
-      filter.year.$lte = maxYear;
+export const list = dbWrapper<undefined, EventModel[]>(
+  async ({ db, params }) => {
+    const {
+      maxYear: maxYearAsString,
+      minYear: minYearAsString,
+      awardsBody: awardsBodyAsString,
+      isOpen: isOpenAsString
+    } = params;
+    const maxYear = maxYearAsString ? parseInt(maxYearAsString) : undefined;
+    const minYear = minYearAsString ? parseInt(minYearAsString) : undefined;
+    const awardsBody = awardsBodyAsString
+      ? (awardsBodyAsString as AwardsBody)
+      : undefined;
+    const isOpen = isOpenAsString ? isOpenAsString === 'true' : undefined;
+
+    const filter: Filter<EventModel> = {};
+    if (maxYear ?? minYear) {
+      filter.year = {};
+      if (maxYear) {
+        filter.year.$lte = maxYear;
+      }
+      if (minYear) {
+        filter.year.$gte = minYear;
+      }
     }
-    if (minYear) {
-      filter.year.$gte = minYear;
+    if (awardsBody) {
+      filter.awardsBody = awardsBody;
     }
+    if (isOpen) {
+      filter.status = { $ne: EventStatus.ARCHIVED };
+    }
+    const events = await db
+      .collection<EventModel>('events')
+      .find(filter)
+      .toArray();
+    return {
+      statusCode: 200,
+      events
+    };
   }
-  if (awardsBody) {
-    filter.awardsBody = awardsBody;
-  }
-  const events = await db.collection<Event>('events').find(filter).toArray();
-  return {
-    statusCode: 200,
-    events
-  };
-});
+);
