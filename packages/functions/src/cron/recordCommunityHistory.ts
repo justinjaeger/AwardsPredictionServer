@@ -5,12 +5,12 @@ import { getContenderPoints } from 'src/helper/getContenderPoints';
 import { shouldLogPredictionsAsTomorrow } from 'src/helper/shouldLogPredictionsAsTomorrow';
 import { dateToYyyymmdd, getDate } from 'src/helper/utils';
 import { dbWrapper } from 'src/helper/wrapper';
-import { EventStatus } from 'src/types/enums';
 import {
   type iCategoryPrediction,
   type EventModel,
   type PredictionSet,
-  type iPrediction
+  type iPrediction,
+  EventStatus
 } from 'src/types/models';
 
 /**

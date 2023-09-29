@@ -1,7 +1,6 @@
 import { type Filter } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
-import { type AwardsBody } from './types/enums';
-import { EventStatus, type EventModel } from './types/models';
+import { EventStatus, type EventModel, type AwardsBody } from './types/models';
 
 // TODO: untested
 export const list = dbWrapper<undefined, EventModel[]>(

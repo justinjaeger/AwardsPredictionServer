@@ -15,8 +15,7 @@ import {
 import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
 import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
-import { CategoryName, CategoryType } from "types/enums.ts";
-import { Contender, EventModel, Movie, Person, PredictionSet, Relationship, Song, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
+import { CategoryName, CategoryType, Contender, EventModel, Movie, Person, PredictionSet, Relationship, Song, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
 
 /**
  * Documentation, all dynamodb commands:

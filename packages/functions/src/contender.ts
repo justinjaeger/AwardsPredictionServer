@@ -1,8 +1,12 @@
 import { ObjectId } from 'mongodb';
 import Tmdb from './helper/tmdb';
 import { dbWrapper } from './helper/wrapper';
-import { type CategoryName, CategoryType } from './types/enums';
-import { type Contender, type Movie } from './types/models';
+import {
+  type CategoryName,
+  CategoryType,
+  type Contender,
+  type Movie
+} from './types/models';
 import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
 

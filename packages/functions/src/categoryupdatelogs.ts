@@ -1,8 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
-import { type CategoryUpdateLog } from './types/models';
+import { CategoryName, type CategoryUpdateLog } from './types/models';
 import { SERVER_ERROR } from './types/responses';
-import { CategoryName } from './types/enums';
 
 /**
  * Used for getting a all dates that you updated your predictions in a given event or category
