@@ -11,7 +11,8 @@ import {
   type EventModel,
   type PredictionSet,
   type User,
-  type CategoryUpdateLog
+  type CategoryUpdateLog,
+  EventStatus
 } from './types/models';
 import { Phase, type CategoryName } from './types/enums';
 import { SERVER_ERROR } from './types/responses';
@@ -109,7 +110,7 @@ export const post = dbWrapper<
         message: `Category ${categoryName} not found on event`
       };
     }
-    const { awardsBody, year, nomDateTime, winDateTime } = event;
+    const { awardsBody, year, nomDateTime, winDateTime, status } = event;
     const {
       type: categoryType,
       phase: categoryPhase,
@@ -121,31 +122,24 @@ export const post = dbWrapper<
     );
     const nomDateHasPassed = !!(nomDateTime && nomDateTime < new Date());
     const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
+    const canPredictWinners =
+      !winDateHasPassed && status === EventStatus.WINS_LIVE;
+    const canPredictNominations =
+      !nomDateHasPassed && status === EventStatus.NOMS_LIVE;
+    const canPredictShortlist =
+      !shortlistDateHasPassed && status === EventStatus.NOMS_LIVE;
+    const phaseUserIsPredicting = canPredictWinners
+      ? Phase.WINNER
+      : canPredictShortlist
+      ? Phase.SHORTLIST
+      : canPredictNominations
+      ? Phase.NOMINATION
+      : Phase.CLOSED;
 
-    /**
-     * A category or event phase goes from null to shortlist to nomination to winner to closed
-     * null/undefined is when you can predict shotlist OR noms depending
-     * shortlist is WHEN YOU CAN PREDICT shortlist
-     * nomination is WHEN YOU CAN PREDICT nomination
-     * winner is WHEN YOU CAN PREDICT winner
-     * closed is WHEN YOU CAN'T PREDICT ANYMORE
-     */
-    if (winDateHasPassed || categoryPhase === Phase.CLOSED) {
+    if (phaseUserIsPredicting === Phase.CLOSED) {
       return {
         ...SERVER_ERROR.BadRequest,
         message: `Event is closed for predictions.`
-      };
-    }
-    if (nomDateHasPassed && categoryPhase !== Phase.WINNER) {
-      return {
-        ...SERVER_ERROR.BadRequest,
-        message: `Event is closed for predictions while nominations occur.`
-      };
-    }
-    if (shortlistDateHasPassed && categoryPhase !== Phase.NOMINATION) {
-      return {
-        ...SERVER_ERROR.BadRequest,
-        message: `Category is closed for predictions while shortlist is compiled.`
       };
     }
 
