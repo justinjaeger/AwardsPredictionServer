@@ -115,7 +115,7 @@ export type iCategory = {
   name: string;
   slots?: number; // 5 by default
   shortlistDateTime?: Date;
-  hideUntilShortlisted?: boolean;
+  isHidden?: boolean;
 };
 
 export type EventModel = {
