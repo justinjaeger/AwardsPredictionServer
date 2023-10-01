@@ -91,18 +91,31 @@ export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
       userId,
       limit: limitAsString,
       pageNumber: pageNumberAsString,
-      includeRecentPredictionSets: includeRecentPredictionSetsAsString
+      includeNestedFields: includeNestedFieldsAsString
     }
   }) => {
     const limit = limitAsString ? parseInt(limitAsString) : undefined;
     const pageNumber = pageNumberAsString
       ? parseInt(pageNumberAsString)
       : undefined;
-    const includeRecentPredictionSets =
-      includeRecentPredictionSetsAsString === 'true';
+    const includeNestedFields = includeNestedFieldsAsString === 'true';
 
     if (!userId) {
       return SERVER_ERROR.BadRequest;
+    }
+
+    const lookup: any = {
+      from: 'users',
+      localField: 'followedUserId',
+      foreignField: '_id',
+      as: 'followedUserList'
+    };
+    if (!includeNestedFields) {
+      lookup.pipeline = [
+        {
+          $project: { username: 1, name: 1, image: 1 }
+        }
+      ];
     }
 
     const followedUsers = await db
@@ -117,21 +130,7 @@ export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
           $project: { _id: 0, followedUserId: 1 }
         },
         ...getAggregatePagination(pageNumber, limit),
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'followedUserId',
-            foreignField: '_id',
-            as: 'followedUserList',
-            pipeline: [
-              {
-                $project: includeRecentPredictionSets
-                  ? { eventsPredicting: 0 }
-                  : { username: 1, name: 1, image: 1 }
-              }
-            ]
-          }
-        }
+        { $lookup: lookup }
       ])
       .map(({ followedUserList }) => followedUserList[0])
       .toArray();
@@ -189,6 +188,31 @@ export const listFollowers = dbWrapper<undefined, Array<Partial<User>>>(
     return {
       statusCode: 200,
       data: followedUsers
+    };
+  }
+);
+
+// UNTESTED: should use an index
+export const listMostFollowed = dbWrapper<undefined, Array<Partial<User>>>(
+  async ({
+    db,
+    params: { limit: limitAsString, pageNumber: pageNumberAsString }
+  }) => {
+    const limit = limitAsString ? parseInt(limitAsString) : undefined;
+    const pageNumber = pageNumberAsString
+      ? parseInt(pageNumberAsString)
+      : undefined;
+
+    const searchCursor = db
+      .collection<User>('users')
+      .find({})
+      .sort({ followerCount: -1 }); // should be supported by an index!!
+    paginateCursor(searchCursor, pageNumber, limit);
+    const userList = await searchCursor.toArray();
+
+    return {
+      statusCode: 200,
+      data: userList
     };
   }
 );
