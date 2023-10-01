@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type WithId } from 'mongodb';
 import Tmdb from './helper/tmdb';
 import { dbWrapper } from './helper/wrapper';
 import {
@@ -14,13 +14,16 @@ import { SERVER_ERROR } from './types/responses';
  * Creates movie/person/song if not exists, then creates contender
  */
 // TODO: untested on people and songs (movie works)
-export const post = dbWrapper<{
-  eventId: string;
-  movieTmdbId: number;
-  categoryName: CategoryName;
-  personTmdbId?: number;
-  songTitle?: string;
-}>(
+export const post = dbWrapper<
+  {
+    eventId: string;
+    movieTmdbId: number;
+    categoryName: CategoryName;
+    personTmdbId?: number;
+    songTitle?: string;
+  },
+  WithId<Contender> | null
+>(
   async ({
     db,
     payload: { eventId, movieTmdbId, categoryName, personTmdbId, songTitle }
@@ -49,7 +52,10 @@ export const post = dbWrapper<{
       const tmdbMovieRes = await Tmdb.getMovieAsDbType(movieTmdbId);
       const tmdbMovie = tmdbMovieRes.data;
       if (!tmdbMovie) {
-        return tmdbMovieRes;
+        return {
+          ...SERVER_ERROR.Error,
+          message: tmdbMovieRes.message ?? 'Tmdb error: Could not get movie'
+        };
       }
       const dbMovie = await db.collection<Movie>('movies').insertOne(tmdbMovie);
       movieId = dbMovie.insertedId;
@@ -66,7 +72,10 @@ export const post = dbWrapper<{
         const tmdbPersonRes = await Tmdb.getPersonAsDbType(personTmdbId);
         const tmdbPerson = tmdbPersonRes.data;
         if (!tmdbPerson) {
-          return tmdbPersonRes;
+          return {
+            ...SERVER_ERROR.Error,
+            message: tmdbPersonRes.message ?? 'Tmdb error: Could not get person'
+          };
         }
         const dbPerson = await db.collection('persons').insertOne(tmdbPerson);
         personId = dbPerson.insertedId;
@@ -101,12 +110,17 @@ export const post = dbWrapper<{
     if (categoryType === CategoryType.SONG && songId) {
       newContender.songId = songId;
     }
-    const contender = await db
+    const res = await db
       .collection<Contender>('contenders')
       .insertOne(newContender);
+    const contenderId = res.insertedId.toString();
+
+    const contender = await db.collection('contenders').findOne({
+      _id: new ObjectId(contenderId)
+    });
     return {
       statusCode: 200,
-      contenderId: contender.insertedId.toString()
+      contender
     };
   }
 );
