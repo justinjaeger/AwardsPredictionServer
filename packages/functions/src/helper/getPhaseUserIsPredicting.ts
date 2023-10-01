@@ -1,5 +1,11 @@
 import { type EventModel, EventStatus, Phase } from 'src/types/models';
 
+/**
+ * If wins have happened, or it's closed, it should return Phase.CLOSED
+ * If a shortlist happened, and you're predicting what the noms will be, it should return Phase.NOMINATION
+ * If nominations happened, and you're predicting what wins, it should return Phase.WINNER
+ * If nothing has already happened, it should return undefined
+ */
 export const getPhaseUserIsPredicting = (
   event: EventModel,
   shortlistDateTime: Date | undefined
@@ -10,18 +16,18 @@ export const getPhaseUserIsPredicting = (
   );
   const nomDateHasPassed = !!(nomDateTime && nomDateTime < new Date());
   const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
-  const canPredictWinners =
-    !winDateHasPassed && status === EventStatus.WINS_LIVE;
-  const canPredictNominations =
-    !nomDateHasPassed && status === EventStatus.NOMS_LIVE;
-  const canPredictShortlist =
-    !shortlistDateHasPassed && status === EventStatus.NOMS_LIVE;
-  const phaseUserIsPredicting = canPredictWinners
+  const isPredictingForbidden =
+    winDateHasPassed || status === EventStatus.ARCHIVED;
+  const isPredictingWinners =
+    nomDateHasPassed && status === EventStatus.WINS_LIVE;
+  const isPredictingNominations =
+    shortlistDateHasPassed && status === EventStatus.NOMS_LIVE;
+  const phaseUserIsPredicting = isPredictingForbidden
+    ? Phase.CLOSED
+    : isPredictingWinners
     ? Phase.WINNER
-    : canPredictShortlist
-    ? Phase.SHORTLIST
-    : canPredictNominations
+    : isPredictingNominations
     ? Phase.NOMINATION
-    : Phase.CLOSED;
+    : undefined;
   return phaseUserIsPredicting;
 };
