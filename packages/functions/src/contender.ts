@@ -21,12 +21,20 @@ export const post = dbWrapper<
     categoryName: CategoryName;
     personTmdbId?: number;
     songTitle?: string;
+    songArtist?: string;
   },
   WithId<Contender> | null
 >(
   async ({
     db,
-    payload: { eventId, movieTmdbId, categoryName, personTmdbId, songTitle }
+    payload: {
+      eventId,
+      movieTmdbId,
+      categoryName,
+      personTmdbId,
+      songTitle,
+      songArtist
+    }
   }) => {
     const categoryType = CATEGORY_NAME_TO_TYPE[categoryName];
     if (categoryType === CategoryType.PERFORMANCE && !personTmdbId) {
@@ -93,7 +101,7 @@ export const post = dbWrapper<
       if (!songId) {
         const dbSong = await db
           .collection('songs')
-          .insertOne({ movieId, title: songTitle });
+          .insertOne({ movieId, title: songTitle, artist: songArtist });
         songId = dbSong.insertedId;
       }
     }
