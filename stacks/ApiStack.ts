@@ -63,6 +63,7 @@ export function ApiStack({ stack }: StackContext) {
       // DELETE
       "DELETE /relationships": `${PATH}/relationship.remove`,
       "DELETE /tokens": `${PATH}/token.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
+      "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
     },
   });
 

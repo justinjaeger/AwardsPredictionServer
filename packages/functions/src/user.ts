@@ -3,7 +3,9 @@ import { dbWrapper } from './helper/wrapper';
 import {
   type RelationshipWithUser,
   type Relationship,
-  type User
+  type User,
+  type Token,
+  UserRole
 } from './types/models';
 import { paginateCursor, getAggregatePagination } from './helper/utils';
 import { SERVER_ERROR } from './types/responses';
@@ -260,6 +262,72 @@ export const put = dbWrapper<Partial<User>, {}>(
       },
       { $set: payload }
     );
+
+    return {
+      statusCode: 200
+    };
+  }
+);
+
+export const remove = dbWrapper<Partial<User>, {}>(
+  async ({ db, authenticatedUserId, params, client }) => {
+    const { userId } = params;
+    if (!authenticatedUserId) {
+      return SERVER_ERROR.Unauthorized;
+    }
+    if (!userId) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const removeUserRelationshipsRequest = db
+      .collection<Relationship>('relationships')
+      .deleteMany({
+        $or: [
+          { followingUserId: new ObjectId(userId) },
+          { followedUserId: new ObjectId(userId) }
+        ]
+      });
+
+    const removeUserTokensRequest = db.collection<Token>('tokens').deleteMany({
+      userId: new ObjectId(userId)
+    });
+
+    const removeUserDataRequest = db.collection<User>('users').updateOne(
+      {
+        _id: new ObjectId(authenticatedUserId)
+      },
+      {
+        $set: {
+          followerCount: 0,
+          followingCount: 0,
+          eventsPredicting: [],
+          recentPredictionSets: [],
+          role: UserRole.USER
+        }
+      }
+    );
+
+    const session = client.startSession();
+    try {
+      session.startTransaction();
+      const res = await Promise.allSettled([
+        removeUserRelationshipsRequest,
+        removeUserTokensRequest,
+        removeUserDataRequest
+      ]);
+      if (res.some(({ status }) => status === 'rejected')) {
+        throw new Error();
+      }
+      await session.commitTransaction();
+    } catch {
+      await session.abortTransaction();
+      return {
+        ...SERVER_ERROR.Error,
+        message: `Error deleting user`
+      };
+    } finally {
+      await session.endSession();
+    }
 
     return {
       statusCode: 200
