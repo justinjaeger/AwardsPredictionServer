@@ -3,7 +3,8 @@ import {
   ObjectId,
   type FindOptions,
   type InsertOneResult,
-  type UpdateResult
+  type UpdateResult,
+  type WithId
 } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
@@ -33,7 +34,7 @@ import { getPhaseUserIsPredicting } from './helper/getPhaseUserIsPredicting';
  */
 export const get = dbWrapper<
   { yyyymmdd: number; categoryName?: CategoryName },
-  PredictionSet
+  WithId<PredictionSet> | null
 >(
   async ({
     db,
@@ -62,7 +63,7 @@ export const get = dbWrapper<
       .findOne(filter, options);
     return {
       statusCode: 200,
-      predictionSet
+      data: predictionSet
     };
   }
 );
