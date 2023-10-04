@@ -53,7 +53,7 @@ export function dbWrapper<Req = {}, Res = {}>(
       ...event.pathParameters,
       ...event.queryStringParameters
     };
-    return await func({
+    const res = await func({
       event,
       context,
       db,
@@ -62,21 +62,6 @@ export function dbWrapper<Req = {}, Res = {}>(
       payload,
       params
     });
-  };
-}
-
-// applies default settings to requests
-export function wrapper<Req = {}, Res = {}>(
-  func: (props: {
-    event: APIGatewayProxyEvent;
-    context: Context;
-    payload: Req;
-  }) => Promise<ApiResponse<Res>>
-) {
-  return async (event: APIGatewayProxyEvent, context: Context) => {
-    // apply default settings to requests
-    context.callbackWaitsForEmptyEventLoop = false; // false sends the response right away when the callback runs, instead of waiting for the Node.js event loop to be empty. If this is false, any outstanding events continue to run during the next invocation.
-    const payload = event.body ? JSON.parse(event.body) : {};
-    return await func({ event, context, payload });
+    return JSON.stringify(res);
   };
 }
