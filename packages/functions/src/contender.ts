@@ -123,12 +123,12 @@ export const post = dbWrapper<
       .insertOne(newContender);
     const contenderId = res.insertedId.toString();
 
-    const contender = await db.collection('contenders').findOne({
+    const contender = await db.collection<Contender>('contenders').findOne({
       _id: new ObjectId(contenderId)
     });
     return {
       statusCode: 200,
-      contender
+      data: contender
     };
   }
 );

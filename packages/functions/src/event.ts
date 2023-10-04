@@ -40,7 +40,7 @@ export const list = dbWrapper<undefined, EventModel[]>(
       .toArray();
     return {
       statusCode: 200,
-      events
+      data: events
     };
   }
 );
