@@ -118,9 +118,11 @@ export const convertContender = (
 }
 
 export const dateToYyyymmdd = (date: Date) => {
-  return parseInt(
-    `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
-  );
+  const str =
+    date.getFullYear().toString() +
+    ('0' + (date.getMonth() + 1).toString()).slice(-2) +
+    ('0' + date.getDate().toString()).slice(-2);
+  return parseInt(str);
 };
 
 export const convertPredictionSet = (
