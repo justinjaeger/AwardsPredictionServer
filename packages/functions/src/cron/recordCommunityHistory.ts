@@ -104,24 +104,31 @@ export const handler = dbWrapper(async ({ db }) => {
 
     console.log('2');
     // tally up points for each contenderId. this is used to sort the contenders
-    const pointsPerContenderId: { [contenderId: string]: number } = {};
+    const pointsPerContenderId: {
+      [categoryName: string]: { [contenderId: string]: number };
+    } = {};
     for (const categoryName of Object.keys(categories)) {
       if (!numPredicting[categoryName]) continue;
+      if (!pointsPerContenderId[categoryName]) {
+        pointsPerContenderId[categoryName] = {};
+      }
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
-        pointsPerContenderId[contenderId] = getContenderPoints(rankings);
+        pointsPerContenderId[categoryName][contenderId] =
+          getContenderPoints(rankings);
       }
     }
     console.log('3');
-    const sortedContenderIds = Object.entries(pointsPerContenderId)
-      .sort(([, a], [, b]) => {
-        // this will sort so the largest number comes first in the list
-        if (a > b) return -1;
-        if (a < b) return 1;
-        return 0;
-      })
-      .map(([contenderId]) => contenderId);
+    const getSortedContenderIds = (categoryName: string) =>
+      Object.entries(pointsPerContenderId[categoryName])
+        .sort(([, a], [, b]) => {
+          // this will sort so the largest number comes first in the list
+          if (a > b) return -1;
+          if (a < b) return 1;
+          return 0;
+        })
+        .map(([contenderId]) => contenderId);
 
     console.log('4');
     // format the "categories" field on PredictionSet
@@ -132,6 +139,7 @@ export const handler = dbWrapper(async ({ db }) => {
       // we need numPredicting amount of predictions for each category
       const predictions: iPrediction[] = [];
       if (!numPredicting[categoryName]) continue;
+      const sortedContenderIds = getSortedContenderIds(categoryName);
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
