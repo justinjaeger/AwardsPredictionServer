@@ -50,8 +50,8 @@ export function ApiStack({ stack }: StackContext) {
       "GET /email/verify": `${PATH}/email.verify`,
       // (fake post requests)
       "POST /movies": `${PATH}/movie.getBatch`,
-      "POST /persons": `${PATH}/movie.getBatch`,
-      "POST /songs": `${PATH}/movie.getBatch`,
+      "POST /persons": `${PATH}/person.getBatch`,
+      "POST /songs": `${PATH}/song.getBatch`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationships": `${PATH}/relationship.post`,
