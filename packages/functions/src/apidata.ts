@@ -13,7 +13,7 @@ export const get = dbWrapper<undefined, WithId<ApiData> | null>(
     if (!eventYear) {
       return {
         ...SERVER_ERROR.BadRequest,
-        message: 'Must provide email'
+        message: 'Must provide event year'
       };
     }
     const year = parseInt(eventYear);

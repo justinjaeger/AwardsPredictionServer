@@ -14,7 +14,7 @@ import {
 } from "./types/amplifyApi.ts";
 import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
-import { CategoryName, CategoryType, ApiData, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
+import { ApiData, CategoryName, CategoryType, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
 import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
 
 /**
@@ -274,21 +274,24 @@ async function handler() {
 
     // MOVIES
     for (const amplifyMovie of movieItems) {
-        apiData[amplifyMovie.tmdbId] = {...convertMovie(amplifyMovie), type: CategoryType.FILM};
+        // @ts-ignore - weird bug when I use CategoryType, so I'm doing just the strings
+        apiData[amplifyMovie.tmdbId] = {...convertMovie(amplifyMovie), type: 'FILM'};
         amplifyIdToTmdbId[amplifyMovie.id] = amplifyMovie.tmdbId.toString();
         amplifyMoviePersonOrSongToTmdbId[amplifyMovie.id] = amplifyMovie.tmdbId.toString();
     }
 
     // PERSONS
     for (const amplifyPerson of personItems) {
-        apiData[amplifyPerson.tmdbId] = {...convertPerson(amplifyPerson), type: CategoryType.PERFORMANCE};
+        // @ts-ignore - weird bug when I use CategoryType, so I'm doing just the strings
+        apiData[amplifyPerson.tmdbId] = {...convertPerson(amplifyPerson), type: 'PERFORMANCE'};
         amplifyMoviePersonOrSongToTmdbId[amplifyPerson.id] = amplifyPerson.tmdbId.toString();
     }
     // SONGS
     for (const amplifySong of songItems) {
         const tmdbId = parseInt(amplifyIdToTmdbId[amplifySong.movieId]);
         const key = getSongKey(tmdbId, amplifySong.title);
-        apiData[key] = {...convertSong(amplifySong, tmdbId), type: CategoryType.SONG};
+        // @ts-ignore - weird bug when I use CategoryType, so I'm doing just the strings
+        apiData[key] = {...convertSong(amplifySong, tmdbId), type: 'SONG'};
         amplifyMoviePersonOrSongToTmdbId[amplifySong.id] = key;
     }
 

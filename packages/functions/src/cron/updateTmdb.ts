@@ -20,8 +20,8 @@ export const handler = dbWrapper(async ({ db, client }) => {
     .find({
       // get all apiData (later we'll filter by just this year)
       $or: [
-        { year: { $gte: minYear } },
-        { year: { $exists: false } } // movies with undefined year SHOULD be null when created - double check
+        { eventYear: { $gte: minYear } },
+        { eventYear: { $exists: false } } // movies with undefined year SHOULD be null when created - double check
       ]
     })
     .toArray();
@@ -34,9 +34,9 @@ export const handler = dbWrapper(async ({ db, client }) => {
       if (key === 'year' || key === '_id') return;
       // @ts-expect-error, we eliminated other possibilities in line above
       const type = value?.type;
-      if (type === 'movie') {
+      if (type === CategoryType.FILM) {
         movieIds.push(key);
-      } else if (type === 'person') {
+      } else if (type === CategoryType.PERFORMANCE) {
         personIds.push(key);
       }
     });
