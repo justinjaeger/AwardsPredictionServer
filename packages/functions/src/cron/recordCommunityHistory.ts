@@ -60,9 +60,9 @@ export const handler = dbWrapper(async ({ db }) => {
     // also get contender info to link to contenderId... this is needed to display the community prediction
     const contenderInfo: {
       [contenderId: string]: {
-        movieId: ObjectId;
-        personId?: ObjectId;
-        songId?: ObjectId;
+        movieTmdbId: number;
+        personTmdbId?: number;
+        songId?: string;
       };
     } = {};
     console.log('1');
@@ -75,8 +75,8 @@ export const handler = dbWrapper(async ({ db }) => {
         // don't record a prediction that's over 30 days old
         if (createdAt < thirtyDaysAgo) continue;
         for (const {
-          movieId,
-          personId,
+          movieTmdbId,
+          personTmdbId,
           songId,
           contenderId: contenderObjectId,
           ranking
@@ -88,8 +88,8 @@ export const handler = dbWrapper(async ({ db }) => {
           if (!numPredicting[categoryName][contenderId]) {
             // first time we encounter the contenderId, fill in this info
             contenderInfo[contenderId] = {
-              movieId,
-              personId,
+              movieTmdbId,
+              personTmdbId,
               songId
             };
             numPredicting[categoryName][contenderId] = {};
@@ -146,7 +146,7 @@ export const handler = dbWrapper(async ({ db }) => {
         // get the actual list ranking
         const ranking = sortedContenderIds.indexOf(contenderId) + 1;
         predictions.push({
-          ...contenderInfo[contenderId], // contains movieId, personId, songId
+          ...contenderInfo[contenderId], // contains movieTmdbId, personTmdbId, songId
           contenderId: new ObjectId(contenderId),
           ranking,
           numPredicting: rankings

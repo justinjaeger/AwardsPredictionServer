@@ -68,8 +68,13 @@ const songTable = 'Song-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionTable = 'Prediction-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionSetTable = 'PredictionSet-jrjijr2sgbhldoizdkwwstdpn4-prod'
 
-// AFTER RUNNING: Make sure to fill with tmdb info with the cron func
-// Id is going to be in a different place depending on if it updated or created
+/**
+ * AFTER RUNNING:
+ * - run updateTmdb script AND recordCommunityHistory scripts
+ * 
+ * DELETE THIS ONCE MIGRATION IS OVER!
+ * - too risky to keep this around
+ */
 // NOTE: If last set of data was inaccurate, should delete all predictionsets before running
 const getResId = (res:any): ObjectId => res.value?._id || res.lastErrorObject?.upserted;
 
@@ -84,6 +89,7 @@ async function handler() {
     await mongodb.collection('users').deleteMany({});
     await mongodb.collection('contenders').deleteMany({});
     await mongodb.collection('apidata').deleteMany({});
+    await mongodb.collection('predictionsets').deleteMany({});
     // await mongodb.collection('movies').deleteMany({});
     // await mongodb.collection('songs').deleteMany({});
     // await mongodb.collection('persons').deleteMany({});
