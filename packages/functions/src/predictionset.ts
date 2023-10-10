@@ -58,9 +58,23 @@ export const get = dbWrapper<
     if (categoryName) {
       options.projection = { [`categories.${categoryName}`]: 1 };
     }
+    // options.projection = { [`categories.SONG`]: 1 }; // DELETE THIS LINE:
+    const startTime = performance.now();
     const predictionSet = await db
       .collection<PredictionSet>('predictionsets')
       .findOne(filter, options);
+    const endTime = performance.now();
+    // 1074ms vs 2857ms total
+    // 249ms vs 1238ms total
+    // IN POSTMAN: 277ms vs 700ms total
+    console.log(
+      'setItemsInCache.all took ' +
+        (endTime - startTime).toString() +
+        ' milliseconds.'
+    );
+    // but then it says "done in 3621ms"
+    // why so long?? It has to reach this server, that's why. Idk why THIS is so slow...
+
     return {
       statusCode: 200,
       data: predictionSet

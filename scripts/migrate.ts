@@ -14,8 +14,8 @@ import {
 } from "./types/amplifyApi.ts";
 import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
+import { CategoryName, CategoryType, ApiData, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
 import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
-import { CategoryName, CategoryType, Contender, EventModel, Movie, Person, PredictionSet, Relationship, Song, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
 
 /**
  * Documentation, all dynamodb commands:
@@ -68,17 +68,38 @@ const songTable = 'Song-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionTable = 'Prediction-jrjijr2sgbhldoizdkwwstdpn4-prod'
 const predictionSetTable = 'PredictionSet-jrjijr2sgbhldoizdkwwstdpn4-prod'
 
+// AFTER RUNNING: Make sure to fill with tmdb info with the cron func
 // Id is going to be in a different place depending on if it updated or created
 // NOTE: If last set of data was inaccurate, should delete all predictionsets before running
 const getResId = (res:any): ObjectId => res.value?._id || res.lastErrorObject?.upserted;
 
 async function handler() {
+    console.log('STARTING...')
     const dynamodb = await connectDynamoDB();
     const mongodb = await connectMongoDB();
+
+    // WARN: This would be terrible to run in production. Delete after first use!!!
+    // DELETE OLD DATA:
+    await mongodb.collection('relationships').deleteMany({});
+    await mongodb.collection('users').deleteMany({});
+    await mongodb.collection('contenders').deleteMany({});
+    await mongodb.collection('apidata').deleteMany({});
+    // await mongodb.collection('movies').deleteMany({});
+    // await mongodb.collection('songs').deleteMany({});
+    // await mongodb.collection('persons').deleteMany({});
 
     // mognodb test:
     // const a = await mongodb.collection('relationships').indexes();
     // console.log('done:', a)
+
+    // DELETE AFTER USE:
+    // create index on mongodb "apidata" collection
+    // await mongodb.collection('apidata').dropIndex('year_1')
+    // await mongodb.collection('apidata').createIndex({eventYear:1}, {unique:true})
+    // console.log('dropping collection')
+    // await mongodb.collection('contenders').dropIndex('eventId_1_category_1_movieId_1_personId_1_songId_1')
+    // console.log('creating collection')
+    // await mongodb.collection('contenders').createIndex({eventId:1, category: 1, movieTmdbId:1, personTmdbId: 1, songId: 1}, {unique:true})
 
     /**
      * NOTE: If the total size of scanned items exceeds the maximum dataset size limit of 1 MB, the scan completes and results are returned to the user.
@@ -180,18 +201,6 @@ async function handler() {
         followerCount: number,
     }} = {};
 
-    // INDEX TESTS:
-    // for (let i=0; i<1; i++) {
-    //     const amplifyUser = userItems[i];
-    //     const mongoUser = convertUser(amplifyUser);
-    //     const amplify_id = amplifyUser.id;
-    //     const res = await mongodb.collection('users').createIndex({oauthId:1}, {unique:true, partialFilterExpression: {oauthId:{$exists: true}}})
-    //     // const res = await mongodb.collection<MongoUser>('users').find({amplify_id}).explain()
-    //     // const res = await mongodb.collection<MongoUser>('users').find({$text:{$search:'justin'}}).explain();
-    //     // const res = await mongodb.collection('users').createIndex({name: 'text', username: 'text'});
-    //     console.log('res',res)
-    // }
-
     // USERS (part one)
     const userReqs: Promise<ModifyResult<User>>[] = [];
     for (const amplifyUser of userItems) {
@@ -252,71 +261,48 @@ async function handler() {
 
     // console.log('amplifyIdToMongoId', amplifyUserIdToData) // this logs
     
-    const amplifyMoviePersonOrSongToMongoId: {[amplifyId: string]: ObjectId} = {};
+    // This is also to ANY KEY including songs
+    const amplifyMoviePersonOrSongToTmdbId: {[amplifyId: string]: string} = {};
+    // const mongoMovieIdToAmplifyMovieId: {[mongoId: string]: string} = {};
+    const amplifyIdToTmdbId: {[amplifyId: string]: string} = {};
+
+    const getSongKey = (movieTmdbId:number, title:string)=>`${movieTmdbId}-${title}`;
+
+    // NOTE: this would not work if there were multiple events/years
+    const eventYear = Object.values(amplifyEventIdToMongoEvent)[0].year;
+    const apiData: ApiData = { eventYear };
 
     // MOVIES
-    const movieReqs: Promise<ModifyResult<Movie>>[] = [];
     for (const amplifyMovie of movieItems) {
-        const amplify_id = amplifyMovie.id;
-        movieReqs.push(
-            mongodb.collection<Movie>('movies').findOneAndUpdate(
-                { amplify_id },
-                { $set: convertMovie(amplifyMovie) },
-                { upsert: true }
-            )
-        )
-    }
-    console.log('inserting movies...')
-    const movieRes = await Promise.all(movieReqs);
-    console.log('done inserting movies.')
-    for (let i in movieRes) {
-        const res = movieRes[i];
-        const amplify_id = movieItems[i].id;
-        amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
+        apiData[amplifyMovie.tmdbId] = {...convertMovie(amplifyMovie), type: CategoryType.FILM};
+        amplifyIdToTmdbId[amplifyMovie.id] = amplifyMovie.tmdbId.toString();
+        amplifyMoviePersonOrSongToTmdbId[amplifyMovie.id] = amplifyMovie.tmdbId.toString();
     }
 
     // PERSONS
-    const personReqs: Promise<ModifyResult<Person>>[] = [];
     for (const amplifyPerson of personItems) {
-        const amplify_id = amplifyPerson.id;
-        personReqs.push(
-            mongodb.collection<Person>('persons').findOneAndUpdate(
-                { amplify_id },
-                { $set: convertPerson(amplifyPerson) },
-                { upsert: true }
-            )
-        )
+        apiData[amplifyPerson.tmdbId] = {...convertPerson(amplifyPerson), type: CategoryType.PERFORMANCE};
+        amplifyMoviePersonOrSongToTmdbId[amplifyPerson.id] = amplifyPerson.tmdbId.toString();
     }
-    console.log('inserting persons...')
-    const personRes = await Promise.all(personReqs);
-    console.log('done inserting persons.')
-    for (let i in personRes) {
-        const res = personRes[i];
-        const amplify_id = personItems[i].id;
-        amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
+    // SONGS
+    for (const amplifySong of songItems) {
+        const tmdbId = parseInt(amplifyIdToTmdbId[amplifySong.movieId]);
+        const key = getSongKey(tmdbId, amplifySong.title);
+        apiData[key] = {...convertSong(amplifySong, tmdbId), type: CategoryType.SONG};
+        amplifyMoviePersonOrSongToTmdbId[amplifySong.id] = key;
     }
 
-    // SONGS
-    const songReqs: Promise<ModifyResult<Song>>[] = [];
-    for (const amplifySong of songItems) {
-        const amplify_id = amplifySong.id;
-        const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifySong.movieId];
-        songReqs.push(
-            mongodb.collection<Song>('songs').findOneAndUpdate(
-                { amplify_id },
-                { $set: convertSong(amplifySong, mongoMovieId) },
-                { upsert: true }
-            )
-        )
-    }
-    console.log('inserting songs...')
-    const songRes = await Promise.all(songReqs);
-    console.log('done inserting songs.')
-    for (let i in songRes) {
-        const res = songRes[i];
-        const amplify_id = songItems[i].id;
-        amplifyMoviePersonOrSongToMongoId[amplify_id] = getResId(res);
-    }
+    // INSERT API DATA
+    // we know this works ONLY because there is JUST ONE event
+    // when we insert api data in future, we have to make sure to insert them into the correct year
+    console.log('inserting api data...')
+    await mongodb.collection<ApiData>('apidata').findOneAndUpdate(
+        { eventYear },
+        { $set: apiData },
+        { upsert: true }
+    )
+    console.log('done inserting api data')
+
 
     // CONTENDERS
     const amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId} = {};
@@ -324,12 +310,12 @@ async function handler() {
     const contenderReqs: Promise<ModifyResult<Contender>>[] = [];
     for (const amplifyContender of contenderItems) {
         const amplify_id = amplifyContender.id;
-        const mongoMovieId = amplifyMoviePersonOrSongToMongoId[amplifyContender.movieId];
+        const movieTmdbId = parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender.movieId]);
         const mongoEventId = amplifyEventIdToMongoEventId[amplifyContender.eventId];
         const categoryName = amplifyCategoryIdToCategory[amplifyContender.categoryId].name;
-        const songId = amplifyContender.songId && amplifyMoviePersonOrSongToMongoId[amplifyContender.songId] || undefined;
-        const personId = amplifyContender.personId && amplifyMoviePersonOrSongToMongoId[amplifyContender.personId] || undefined;
-        const mongoContender = convertContender(amplifyContender, mongoMovieId, mongoEventId, categoryName, songId, personId);
+        const songId = amplifyContender.songId && amplifyMoviePersonOrSongToTmdbId[amplifyContender.songId] || undefined;
+        const personTmdbId = amplifyContender.personId && parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender.personId]) || undefined;
+        const mongoContender = convertContender(amplifyContender, mongoEventId, categoryName, movieTmdbId, personTmdbId, songId);
         contenderReqs.push(
             mongodb.collection<Contender>('contenders').findOneAndUpdate(
                 { amplify_id },

@@ -48,10 +48,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /jwt": `${PATH}/jwt.get`,
       "GET /email/send": `${PATH}/email.send`,
       "GET /email/verify": `${PATH}/email.verify`,
-      // (fake post requests)
-      "POST /movies": `${PATH}/movie.getBatch`,
-      "POST /persons": `${PATH}/person.getBatch`,
-      "POST /songs": `${PATH}/song.getBatch`,
+      "GET /apidata": `${PATH}/apidata.get`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationships": `${PATH}/relationship.post`,

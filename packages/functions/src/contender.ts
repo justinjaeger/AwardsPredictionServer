@@ -5,18 +5,22 @@ import {
   type CategoryName,
   CategoryType,
   type Contender,
-  type Movie
+  type Movie,
+  type Person,
+  type Song,
+  type ApiData
 } from './types/models';
 import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
+import { getSongKey } from './helper/getSongKey';
 
 /**
  * Creates movie/person/song if not exists, then creates contender
  */
-// TODO: untested on people and songs (movie works)
 export const post = dbWrapper<
   {
     eventId: string;
+    eventYear: number;
     movieTmdbId: number;
     categoryName: CategoryName;
     personTmdbId?: number;
@@ -29,6 +33,7 @@ export const post = dbWrapper<
     db,
     payload: {
       eventId,
+      eventYear,
       movieTmdbId,
       categoryName,
       personTmdbId,
@@ -50,73 +55,68 @@ export const post = dbWrapper<
       };
     }
 
-    // get or create movie from tmdb
-    let movieId: ObjectId | undefined;
-    const movie = await db
-      .collection<Movie>('movies')
-      .findOne({ tmdbId: movieTmdbId }, { projection: { _id: 1 } });
-    movieId = movie?._id;
-    if (!movieId) {
-      const tmdbMovieRes = await Tmdb.getMovieAsDbType(movieTmdbId);
-      const tmdbMovie = tmdbMovieRes.data;
-      if (!tmdbMovie) {
+    const key =
+      categoryType === CategoryType.FILM
+        ? movieTmdbId
+        : categoryType === CategoryType.PERFORMANCE
+        ? personTmdbId
+        : categoryType === CategoryType.SONG && songTitle
+        ? getSongKey(movieTmdbId, songTitle)
+        : undefined;
+    if (key === undefined) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const apiDataField = await db
+      .collection<ApiData>('apidata')
+      .findOne({ eventYear }, { projection: { [key]: 1 } });
+
+    // if doesn't exist in apiData, must create it
+    if (!apiDataField) {
+      let newApiData: Movie | Person | Song | undefined;
+      if (categoryType === CategoryType.FILM) {
+        const { data } = await Tmdb.getMovieAsDbType(movieTmdbId);
+        newApiData = data;
+      } else if (categoryType === CategoryType.PERFORMANCE && personTmdbId) {
+        const { data } = await Tmdb.getPersonAsDbType(personTmdbId);
+        newApiData = data;
+      } else if (categoryType === CategoryType.SONG && songTitle) {
+        const data: Song = {
+          movieTmdbId,
+          title: songTitle,
+          artist: songArtist ?? ''
+        };
+        newApiData = data;
+      }
+      if (!newApiData) {
         return {
-          ...SERVER_ERROR.Error,
-          message: tmdbMovieRes.message ?? 'Tmdb error: Could not get movie'
+          ...SERVER_ERROR.BadRequest,
+          message: `Tmdb could not provide data for ${
+            categoryType === CategoryType.FILM ? 'movie' : 'person'
+          }`
         };
       }
-      const dbMovie = await db.collection<Movie>('movies').insertOne(tmdbMovie);
-      movieId = dbMovie.insertedId;
-    }
-
-    // get person from tmdb (if it's a performance)
-    let personId: ObjectId | undefined;
-    if (categoryType === CategoryType.PERFORMANCE && personTmdbId) {
-      const person = await db
-        .collection('persons')
-        .findOne({ tmdbId: personTmdbId });
-      personId = person?._id;
-      if (!personId) {
-        const tmdbPersonRes = await Tmdb.getPersonAsDbType(personTmdbId);
-        const tmdbPerson = tmdbPersonRes.data;
-        if (!tmdbPerson) {
-          return {
-            ...SERVER_ERROR.Error,
-            message: tmdbPersonRes.message ?? 'Tmdb error: Could not get person'
-          };
+      // insert new data into db
+      await db.collection<ApiData>('apidata').insertOne({
+        eventYear,
+        [key]: {
+          type: categoryType,
+          ...newApiData
         }
-        const dbPerson = await db.collection('persons').insertOne(tmdbPerson);
-        personId = dbPerson.insertedId;
-      }
-    }
-
-    // get or create song (if it's a song)
-    let songId: ObjectId | undefined;
-    if (categoryType === CategoryType.SONG && songTitle) {
-      // check if song exists in db
-      const song = await db
-        .collection('songs')
-        .findOne({ movieId, title: songTitle });
-      songId = song?._id;
-      if (!songId) {
-        const dbSong = await db
-          .collection('songs')
-          .insertOne({ movieId, title: songTitle, artist: songArtist });
-        songId = dbSong.insertedId;
-      }
+      });
     }
 
     // at this point, the movie, person, and/or songs are created, and we can just attach them to the contender
     const newContender: Contender = {
       eventId: new ObjectId(eventId),
-      movieId,
+      movieTmdbId,
       category: categoryName
     };
-    if (categoryType === CategoryType.PERFORMANCE && personId) {
-      newContender.personId = personId;
+    if (categoryType === CategoryType.PERFORMANCE && personTmdbId) {
+      newContender.personTmdbId = personTmdbId;
     }
-    if (categoryType === CategoryType.SONG && songId) {
-      newContender.songId = songId;
+    if (categoryType === CategoryType.SONG && songTitle) {
+      newContender.songId = getSongKey(movieTmdbId, songTitle);
     }
     const res = await db
       .collection<Contender>('contenders')

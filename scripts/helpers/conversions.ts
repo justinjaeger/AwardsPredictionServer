@@ -87,33 +87,33 @@ export const convertPerson = (
 // Must be done after Movie
 export const convertSong = (
     amplifySong: AmplifySong,
-    mongoMovieId: ObjectId,
+    movieTmdbId: number,
 ): Song => {
     return {
         amplify_id: amplifySong.id,
         title: amplifySong.title,
-        movieId: mongoMovieId,
+        movieTmdbId,
     }
 }
 
 
 export const convertContender = (
     amplifyContender: AmplifyContender,
-    mongoMovieId: ObjectId,
     mongoEventId: ObjectId,
     categoryName: CategoryName,
-    songId?: ObjectId,
-    personId?: ObjectId,
+    tmdbMovieId: number,
+    tmdbPersonId?: number,
+    songId?: string,
 ): Contender => {
     const isHidden = amplifyContender.visibility === AmplifyContenderVisibility.HIDDEN ? true : false;
     return {
         amplify_id: amplifyContender.id,
-        movieId: mongoMovieId,
+        movieTmdbId: tmdbMovieId,
         eventId: mongoEventId,
         category: categoryName,
         isHidden,
         songId,
-        personId,
+        personTmdbId: tmdbPersonId,
     }
 }
 
@@ -142,13 +142,13 @@ export const convertPredictionSet = (
         const { name, type } = amplifyCategoryIdToCategory[predictionSet.categoryId];
         const predictionsInSet = amplifyPredictions.filter((prediction)=>prediction.predictionSetId === predictionSet.id);
         const predictions = predictionsInSet.map((prediction)=>{
-            const { movieId, personId, songId } = amplifyContenderIdToMongoContender[prediction.contenderId];
+            const { movieTmdbId, personTmdbId, songId } = amplifyContenderIdToMongoContender[prediction.contenderId];
             const contenderId = amplifyContenderIdToMongoContenderId[prediction.contenderId];
             return {
                 contenderId,
                 ranking: prediction.ranking,
-                movieId,
-                personId,
+                movieTmdbId,
+                personTmdbId,
                 songId,
             }
         })
