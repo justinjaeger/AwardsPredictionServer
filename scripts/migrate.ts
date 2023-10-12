@@ -1,4 +1,4 @@
-import { ModifyResult, ObjectId } from "mongodb";
+import { ModifyResult, ObjectId, WithId } from "mongodb";
 import { AttributeValue, ScanCommand, ScanCommandOutput } from "@aws-sdk/client-dynamodb";
 import { 
     AmplifyCategory, 
@@ -14,12 +14,14 @@ import {
 } from "./types/amplifyApi.ts";
 import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
-import { ApiData, CategoryName, CategoryType, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iRecentPrediction } from "types/mongoApi.ts";
-import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertContender, convertEvent, convertMovie, convertPerson, convertPredictionSet, convertSong, convertUser } from "./helpers/conversions.ts";
+import { ApiData, CategoryName, CategoryType, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iCategoryPrediction, iPrediction, iRecentPrediction } from "types/mongoApi.ts";
+import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertEvent, convertMovie, convertPerson, convertSong, convertUser, dateToYyyymmdd } from "./helpers/conversions.ts";
 
 /**
  * Documentation, all dynamodb commands:
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/
+ * 
+ * NOTE: For some reason, ENUMS do not work here, so just use STRINGS
  */
 
 // interface User {
@@ -314,34 +316,9 @@ async function handler() {
 
 
     // CONTENDERS
-    const amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId} = {};
-    const amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: Contender} = {};
-    const contenderReqs: Promise<ModifyResult<Contender>>[] = [];
-    for (const amplifyContender of contenderItems) {
-        const amplify_id = amplifyContender.id;
-        const movieTmdbId = parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender.movieId]);
-        const mongoEventId = amplifyEventIdToMongoEventId[amplifyContender.eventId];
-        const categoryName = amplifyCategoryIdToCategory[amplifyContender.categoryId].name;
-        const songId = amplifyContender.songId && amplifyMoviePersonOrSongToTmdbId[amplifyContender.songId] || undefined;
-        const personTmdbId = amplifyContender.personId && parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender.personId]) || undefined;
-        const mongoContender = convertContender(amplifyContender, mongoEventId, categoryName, movieTmdbId, personTmdbId, songId);
-        contenderReqs.push(
-            mongodb.collection<Contender>('contenders').findOneAndUpdate(
-                { amplify_id },
-                { $set: mongoContender },
-                { upsert: true }
-            )
-        )
-        amplifyContenderIdToMongoContender[amplify_id] = mongoContender;
-    }
-    console.log('inserting contenders...')
-    const contenderRes = await Promise.all(contenderReqs);
-    console.log('done inserting contenders.')
-    for (let i in contenderRes) {
-        const res = contenderRes[i];
-        const amplify_id = contenderItems[i].id;
-        amplifyContenderIdToMongoContenderId[amplify_id] = getResId(res);
-    }
+    const getContenderKey = (c: Contender) => `${c.eventId}-${c.category}-${c.movieTmdbId}-${c.personTmdbId}-${c.songId}`;
+    const mongoKeyedContender: Record<string, WithId<Contender>> = {};
+
 
     // PREDICTIONSETS
     // First, loop through events
@@ -351,7 +328,7 @@ async function handler() {
     // As we go, update the user's prediction set list
     for (const amplifyEvent of eventItems) {
         const amplifyEventId = amplifyEvent.id;
-        const mongoDbEventId = amplifyEventIdToMongoEventId[amplifyEvent.id];
+        const mongoDbEventId = amplifyEventIdToMongoEventId[amplifyEventId];
 
         const amplifyIdToMongoPredictionSet: {[amplifyId: string]: PredictionSet} = {};
         const predictionSetReqs: Promise<ModifyResult<PredictionSet> | void>[] = [];
@@ -365,22 +342,82 @@ async function handler() {
                 predictionSetReqs.push(Promise.resolve())
                 continue;
             };
-            const mongoDbPredictionSet = convertPredictionSet(
-                filteredPredictionSets,
-                predictionItems,
-                mongoDbUserId,
-                mongoDbEventId,
-                amplifyCategoryIdToCategory,
-                amplifyContenderIdToMongoContenderId,
-                amplifyContenderIdToMongoContender,
-            );
+            /**
+             * THE FOLLOWING is pretty fucked because we can't trust amplify's "prediction.contender" field.
+             * It points to the wrong contender often, even when it's in the right predictionset.
+             * Therefore, we create unique contenders as we go, according to information that we know is correct, and save those.
+             */
+            let latestYyyymmdd = 0;
+            const categories = {} as {[key in CategoryName]: iCategoryPrediction};
+            // FIRST, let's create the contenders.
+            for (const predictionSet of filteredPredictionSets) {
+                const yyyymmdd = dateToYyyymmdd(new Date(predictionSet.createdAt));
+                latestYyyymmdd = Math.max(latestYyyymmdd, yyyymmdd);
+                
+                // CORRECT - we can trust predictionSet.categoryId
+                const { name, type } = amplifyCategoryIdToCategory[predictionSet.categoryId];
+                const predictionsInSet = predictionItems.filter((prediction)=>prediction.predictionSetId === predictionSet.id);
+                const predictions: iPrediction[] = [];
+                for (const prediction of predictionsInSet) {
+
+                    // Create contenders from scratch
+                    const amplifyContender = contenderItems.find((contender)=>contender.id === prediction.contenderId);
+                    if (!amplifyContender) throw new Error('amplifyContender not found');
+                    // we can grant that movieTmdbId is correct...
+                    const movieTmdbId = parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender.movieId]);
+                    // ...and that persons and songs are ok...
+                    const personTmdbId = type === 'PERFORMANCE' ? parseInt(amplifyMoviePersonOrSongToTmdbId[amplifyContender?.personId ?? ''] ?? undefined) : undefined;
+                    const songId = type === "SONG" ? amplifyMoviePersonOrSongToTmdbId[amplifyContender?.songId ?? ''] ?? undefined : undefined;
+
+                    // Since we can't even rely on the fact that a contender EXISTS where it's supposed to,
+                    // We'll have to just create it here.
+                    const newContender: Contender = {
+                        eventId: mongoDbEventId,
+                        category: name,
+                        movieTmdbId,
+                        personTmdbId,
+                        songId,
+                    }
+                    let contenderFromStore = mongoKeyedContender[getContenderKey(newContender)] as WithId<Contender> | undefined;
+                    if (!contenderFromStore) {
+                        const res = await mongodb.collection<Contender>('contenders').findOneAndUpdate(
+                            newContender,
+                            { $set: newContender},
+                            { upsert: true }
+                        )
+                        const id = getResId(res);
+                        mongoKeyedContender[getContenderKey(newContender)] = { _id: id, ...newContender };
+                        contenderFromStore = { _id: id, ...newContender };
+                    }
+
+                    // finally, create the prediction
+                    predictions.push({
+                        contenderId: contenderFromStore._id,
+                        ranking: prediction.ranking,
+                        movieTmdbId,
+                        personTmdbId,
+                        songId,
+                    })
+                }
+                // add the category to the categories object for the user's predictionset
+                categories[name] = {
+                    createdAt: new Date(predictionSet.createdAt),
+                    predictions,
+                }
+            }
+            const mongoDbPredictionSet: PredictionSet = {
+                userId: mongoDbUserId,
+                eventId: mongoDbEventId,
+                yyyymmdd: latestYyyymmdd,
+                categories,
+            }
             // keep in mind: we just recorded these yesterday, so they won't match today.
             // and yesterday's were broken.
             // So we should delete all in the table, before running this again
             predictionSetReqs.push(
                 mongodb.collection<PredictionSet>('predictionsets').findOneAndUpdate(
-                    { userId: mongoDbUserId, eventId: mongoDbEventId, yyyymmdd: mongoDbPredictionSet.yyyymmdd },
-                    { $set: mongoDbPredictionSet },
+                    { userId: mongoDbPredictionSet.userId, eventId: mongoDbPredictionSet.eventId, yyyymmdd: mongoDbPredictionSet.yyyymmdd },
+                    { $set: mongoDbPredictionSet},
                     { upsert: true }
                 )
             )
