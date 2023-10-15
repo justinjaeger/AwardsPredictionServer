@@ -55,11 +55,13 @@ export function ApiStack({ stack }: StackContext) {
       "POST /tokens": `${PATH}/token.post`,
       "POST /predictionsets": `${PATH}/predictionset.post`,
       "POST /contenders": `${PATH}/contender.post`,
+      "POST /image": `${PATH}/storage.post`,
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
-      "DELETE /relationships": `${PATH}/relationship.remove`,
-      "DELETE /tokens": `${PATH}/token.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
+      "DELETE /relationships/{followedUserId}": `${PATH}/relationship.remove`,
+      "DELETE /tokens/{token}": `${PATH}/token.remove`,
+      "DELETE /tokens/user": `${PATH}/token.removeAll`,
       "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
     },
   });

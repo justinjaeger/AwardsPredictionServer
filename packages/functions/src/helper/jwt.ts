@@ -13,10 +13,7 @@ const createAccessToken = (userId: string): string => {
 const createRefreshToken = (userId: string): string => {
   const newToken = jwt.sign(
     { userId, isRefreshToken: true },
-    process.env.JWT_SECRET ?? '',
-    {
-      expiresIn: '30m'
-    }
+    process.env.JWT_SECRET ?? ''
   );
   return newToken;
 };

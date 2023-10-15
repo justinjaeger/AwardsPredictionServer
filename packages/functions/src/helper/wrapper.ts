@@ -30,7 +30,7 @@ export function dbWrapper<Req = {}, Res = {}>(
     // connect to mongodb
     const { db, client } = connect();
     // decode userId from jwt (header looks like "Authorization: Bearer <token>")
-    const accessToken = event?.headers?.Authorization?.split(' ')[2];
+    const accessToken = event?.headers?.authorization?.split(' ')?.[1];
     let authenticatedUserId: string | undefined;
     if (accessToken) {
       try {
@@ -42,10 +42,10 @@ export function dbWrapper<Req = {}, Res = {}>(
         }
       } catch (err: any) {
         if (err?.name === 'TokenExpiredError') {
-          return {
+          return JSON.stringify({
             statusCode: 401,
             error: 'TokenExpiredError'
-          };
+          });
         }
       }
     }

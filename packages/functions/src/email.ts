@@ -36,7 +36,7 @@ export const send = dbWrapper<undefined, string>(
 /**
  * Confirm or deny email verification code
  * Note: client must verify that the payload email matches the email the person is trying to verify
- * link looks like: oscar://signin/?token={jwt}&email={email")
+ * link looks like: oscar://signin/?token={jwt}
  */
 export const verify = dbWrapper<undefined, string>(
   async ({ params: { link } }) => {
@@ -47,14 +47,10 @@ export const verify = dbWrapper<undefined, string>(
       };
     }
     // parse the link
-    const { email, token } = parseEmailLink(link);
+    const { token } = parseEmailLink(link);
     const payload = Jwt.validateEmailToken(token);
-    if (!payload) {
-      return {
-        ...SERVER_ERROR.InvalidTokenError,
-        message: 'Invalid token'
-      };
-    } else if (payload.email !== email) {
+    const email = payload?.email;
+    if (!email) {
       return {
         ...SERVER_ERROR.InvalidTokenError,
         message: 'Invalid token'

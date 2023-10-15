@@ -55,44 +55,68 @@ export const post = dbWrapper<{}, string>(
 
     const refreshToken = Jwt.createRefreshToken(authenticatedUserId);
 
-    const tokens = db.collection<Token>('tokens');
-    await tokens.insertOne({
-      userId: new ObjectId(authenticatedUserId),
-      token: refreshToken
-    });
-
-    return {
-      statusCode: 200,
-      data: refreshToken
-    };
+    try {
+      // upserting just in case this token already exists
+      await db.collection<Token>('tokens').findOneAndUpdate(
+        { token: refreshToken },
+        {
+          $set: {
+            userId: new ObjectId(authenticatedUserId),
+            token: refreshToken
+          }
+        },
+        { upsert: true }
+      );
+      return {
+        statusCode: 200,
+        data: refreshToken
+      };
+    } catch (e) {
+      console.error('error creating refresh token', e);
+      return SERVER_ERROR.ServerError;
+    }
   }
 );
 
 /**
- * Deletes a refresh token if token is passed
- * Deletes all user tokens if userId is passed
+ * Deletes a refresh token
  */
 export const remove = dbWrapper<{ token: string }, string>(
-  async ({ db, payload: { token }, authenticatedUserId: userId }) => {
-    if (!userId) {
-      return SERVER_ERROR.Unauthenticated;
-    }
-
+  async ({ db, params: { token } }) => {
     const tokens = db.collection<Token>('tokens');
 
-    if (!token && !userId) {
+    if (!token) {
       return {
         ...SERVER_ERROR.BadRequest,
         message: 'Missing body properties'
       };
     }
 
-    if (token) {
+    try {
       await tokens.deleteOne({ token });
-    } else if (userId) {
-      await tokens.deleteMany({ userId: new ObjectId(userId) });
+      return { statusCode: 200 };
+    } catch (e) {
+      return SERVER_ERROR.ServerError;
+    }
+  }
+);
+
+/**
+ * Removes all tokens associated with a user
+ */
+export const removeAll = dbWrapper<{ token: string }, string>(
+  async ({ db, authenticatedUserId: userId }) => {
+    if (!userId) {
+      return SERVER_ERROR.Unauthenticated;
     }
 
-    return { statusCode: 200 };
+    const tokens = db.collection<Token>('tokens');
+
+    try {
+      await tokens.deleteMany({ userId: new ObjectId(userId) });
+      return { statusCode: 200 };
+    } catch (e) {
+      return SERVER_ERROR.ServerError;
+    }
   }
 );
