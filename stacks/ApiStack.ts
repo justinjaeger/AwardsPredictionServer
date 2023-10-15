@@ -35,7 +35,7 @@ export function ApiStack({ stack }: StackContext) {
     routes: {
       // GET
       "GET /": `${PATH}/test.get`, // for testing
-      "GET /users/{userId}": `${PATH}/user.get`,
+      "GET /users": `${PATH}/user.get`,
       "GET /users/{userId}/following": `${PATH}/user.listFollowings`,
       "GET /users/{userId}/followers": `${PATH}/user.listFollowers`,
       "GET /users/mostFollowed": `${PATH}/user.listMostFollowed`,
