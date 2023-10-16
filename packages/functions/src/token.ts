@@ -12,7 +12,7 @@ import { SERVER_ERROR } from './types/responses';
 export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   // the wrapper isn't going to let the refresh token pass, so handle it here
 
-  const refreshToken = event?.headers?.Authorization?.split(' ')[1];
+  const refreshToken = event?.headers?.authorization?.split(' ')?.[1];
   if (!refreshToken) {
     return {
       ...SERVER_ERROR.BadRequest,
@@ -37,9 +37,11 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
     return SERVER_ERROR.RevokeAccess;
   }
 
+  const newAccessToken = Jwt.createAccessToken(userId);
+
   return {
     statusCode: 200,
-    data: Jwt.createAccessToken(userId)
+    data: newAccessToken
   };
 });
 
