@@ -29,6 +29,8 @@ export function ApiStack({ stack }: StackContext) {
           JWT_SECRET: process.env.JWT_SECRET || '',
           TMDB_API_KEY: process.env.TMDB_API_KEY || '',
           SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+          S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID || '',
+          S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY || '',
         },
       },
     },
