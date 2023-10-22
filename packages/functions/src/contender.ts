@@ -39,8 +39,13 @@ export const post = dbWrapper<
       personTmdbId,
       songTitle,
       songArtist
-    }
+    },
+    authenticatedUserId
   }) => {
+    if (!authenticatedUserId) {
+      return SERVER_ERROR.Unauthorized;
+    }
+
     const categoryType = CATEGORY_NAME_TO_TYPE[categoryName];
     if (categoryType === CategoryType.PERFORMANCE && !personTmdbId) {
       return {
