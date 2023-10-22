@@ -64,22 +64,32 @@ export const get = dbWrapper<
 export const search = dbWrapper<
   { query: string; limit?: number; pageNumber?: number },
   Array<Partial<User>>
->(async ({ db, payload: { query, limit, pageNumber } }) => {
-  if (!query) {
-    return SERVER_ERROR.BadRequest;
+>(
+  async ({
+    db,
+    params: { query, limit: limitAsString, pageNumber: pageNumberAsString }
+  }) => {
+    const limit = limitAsString ? parseInt(limitAsString) : undefined;
+    const pageNumber = pageNumberAsString
+      ? parseInt(pageNumberAsString)
+      : undefined;
+
+    if (!query) {
+      return SERVER_ERROR.BadRequest;
+    }
+
+    const searchCursor = db.collection<User>('users').find({
+      $text: { $search: query }
+    });
+    paginateCursor(searchCursor, pageNumber, limit);
+    const userList = await searchCursor.toArray();
+
+    return {
+      statusCode: 200,
+      data: userList
+    };
   }
-
-  const searchCursor = db.collection<User>('users').find({
-    $text: { $search: 'bro' }
-  });
-  paginateCursor(searchCursor, pageNumber, limit);
-  const userList = await searchCursor.toArray();
-
-  return {
-    statusCode: 200,
-    data: userList
-  };
-});
+);
 
 /**
  * If I want the recent predictions from who user is following,
