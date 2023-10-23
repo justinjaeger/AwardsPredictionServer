@@ -16,6 +16,7 @@ import { getSongKey } from './helper/getSongKey';
 
 /**
  * Creates movie/person/song if not exists, then creates contender
+ * If contender DOES already exist, just return it
  */
 export const post = dbWrapper<
   {
@@ -101,7 +102,7 @@ export const post = dbWrapper<
           }`
         };
       }
-      // insert new data into db
+
       await db.collection<ApiData>('apidata').insertOne({
         eventYear,
         [key]: {
@@ -123,14 +124,24 @@ export const post = dbWrapper<
     if (categoryType === CategoryType.SONG && songTitle) {
       newContender.songId = getSongKey(movieTmdbId, songTitle);
     }
-    const res = await db
-      .collection<Contender>('contenders')
-      .insertOne(newContender);
-    const contenderId = res.insertedId.toString();
 
-    const contender = await db.collection<Contender>('contenders').findOne({
-      _id: new ObjectId(contenderId)
-    });
+    let contender: WithId<Contender> | null;
+    try {
+      const res = await db
+        .collection<Contender>('contenders')
+        .insertOne(newContender);
+      const contenderId = res.insertedId.toString();
+      contender = await db.collection<Contender>('contenders').findOne({
+        _id: new ObjectId(contenderId)
+      });
+    } catch (e) {
+      contender = await db.collection<Contender>('contenders').findOne({
+        eventId: new ObjectId(eventId),
+        movieTmdbId,
+        category: categoryName
+      });
+    }
+
     return {
       statusCode: 200,
       data: contender
