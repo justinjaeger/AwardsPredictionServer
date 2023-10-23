@@ -1,11 +1,4 @@
-import {
-  type Filter,
-  ObjectId,
-  type FindOptions,
-  type InsertOneResult,
-  type UpdateResult,
-  type WithId
-} from 'mongodb';
+import { type Filter, ObjectId, type FindOptions, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type iPrediction,
@@ -14,7 +7,9 @@ import {
   type User,
   type CategoryUpdateLog,
   type CategoryName,
-  Phase
+  Phase,
+  type iCategoryPrediction,
+  type EventUpdateLog
 } from './types/models';
 import { SERVER_ERROR } from './types/responses';
 import { dateToYyyymmdd, getDate } from './helper/utils';
@@ -24,6 +19,7 @@ import {
 } from './helper/constants';
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
 import { getPhaseUserIsPredicting } from './helper/getPhaseUserIsPredicting';
+import { stripId } from './helper/stripId';
 
 /**
  * Get the most recent predictionset if yyyymmdd is not provided
@@ -59,19 +55,19 @@ export const get = dbWrapper<
       options.projection = { [`categories.${categoryName}`]: 1 };
     }
     // options.projection = { [`categories.SONG`]: 1 }; // DELETE THIS LINE:
-    const startTime = performance.now();
+    // const startTime = performance.now();
     const predictionSet = await db
       .collection<PredictionSet>('predictionsets')
       .findOne(filter, options);
-    const endTime = performance.now();
+    // const endTime = performance.now();
     // 1074ms vs 2857ms total
     // 249ms vs 1238ms total
     // IN POSTMAN: 277ms vs 700ms total
-    console.log(
-      'setItemsInCache.all took ' +
-        (endTime - startTime).toString() +
-        ' milliseconds.'
-    );
+    // console.log(
+    //   'setItemsInCache.all took ' +
+    //     (endTime - startTime).toString() +
+    //     ' milliseconds.'
+    // );
     // but then it says "done in 3621ms"
     // why so long?? It has to reach this server, that's why. Idk why THIS is so slow...
 
@@ -105,12 +101,12 @@ export const post = dbWrapper<
     payload: { eventId, categoryName, predictions },
     authenticatedUserId
   }) => {
+    const startTime = performance.now(); // TODO: remove
+
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;
     }
     const userId = authenticatedUserId;
-
-    const session = client.startSession();
 
     // get the category for the most recent phase
     const event = await db
@@ -162,76 +158,7 @@ export const post = dbWrapper<
         { sort: { yyyymmdd: -1 } }
       );
 
-    let predictionSetRequest:
-      | Promise<InsertOneResult<PredictionSet>>
-      | Promise<UpdateResult<PredictionSet>>;
-
-    // create predictionset if it doesn't exist. means it's the first prediction the user has made for this event
-    if (!mostRecentPredictionSet) {
-      predictionSetRequest = db
-        .collection<PredictionSet>('predictionsets')
-        .insertOne(
-          {
-            userId: new ObjectId(userId),
-            eventId: new ObjectId(eventId),
-            yyyymmdd,
-            // @ts-expect-error - This should only have partial data
-            categories: {
-              [categoryName]: {
-                type: categoryType,
-                phase: phaseUserIsPredicting,
-                createdAt: new Date(),
-                predictions
-              }
-            }
-          },
-          { session }
-        );
-      // else if predictionset exists for event, update it
-    } else {
-      const requiresNewEntry = yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
-      if (requiresNewEntry) {
-        // create a copy of the most recent predictionset, but with a new yyyymmdd, and update the category
-        predictionSetRequest = db
-          .collection<PredictionSet>('predictionsets')
-          .insertOne(
-            {
-              ...mostRecentPredictionSet,
-              yyyymmdd,
-              categories: {
-                ...mostRecentPredictionSet.categories,
-                [categoryName]: {
-                  type: categoryType,
-                  phase: phaseUserIsPredicting,
-                  createdAt: new Date(),
-                  predictions
-                }
-              }
-            },
-            { session }
-          );
-      } else {
-        // update the current prediction set
-        predictionSetRequest = db
-          .collection<PredictionSet>('predictionsets')
-          .updateOne(
-            { _id: mostRecentPredictionSet._id },
-            {
-              $set: {
-                [`categories.$.${categoryName}`]: {
-                  type: categoryType,
-                  phase: phaseUserIsPredicting,
-                  createdAt: new Date(),
-                  predictions
-                }
-              }
-            },
-            { session }
-          );
-      }
-    }
-
-    // update the user's recentPredictionSets, setting the new one at the top of the list
+    // prepare to update the user's recentPredictionSets
     const user = await db
       .collection<User>('users')
       .findOne(
@@ -253,54 +180,98 @@ export const post = dbWrapper<
     if (userRecentPredictionSets?.length > RECENT_PREDICTION_SETS_TO_SHOW) {
       userRecentPredictionSets.pop();
     }
-    const userRequest = db.collection<User>('users').updateOne(
-      {
-        _id: new ObjectId(userId)
-      },
-      { $set: { recentPredictionSets: userRecentPredictionSets } },
-      { session }
-    );
-
-    // update categoryUpdateLogs - we'll use this to fill out a calendar of days where we made updates
-    const categoryUpdateLogsRequest = db
-      .collection<CategoryUpdateLog>('categoryupdatelogs')
-      .updateOne(
-        {
-          userId: new ObjectId(userId),
-          eventId: new ObjectId(eventId),
-          category: categoryName
-        },
-        { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
-        { upsert: true, session } // useful the first time a user updates a category
-      );
-    // useful if you don't want the calendar to be filled by category but the event overall
-    const eventUpdateLogsRequest = db
-      .collection<CategoryUpdateLog>('categoryupdatelogs')
-      .updateOne(
-        {
-          userId: new ObjectId(userId),
-          eventId: new ObjectId(eventId)
-        },
-        { $set: { [`yyyymmddUpdates.$.${yyyymmdd}`]: true } },
-        { upsert: true, session } // useful the first time a user updates a category
-      );
 
     // atomically execute all requests
     // Important:: You must pass the session to all requests!!
+    const session = client.startSession();
     try {
-      session.startTransaction();
-      const res = await Promise.allSettled([
-        predictionSetRequest,
-        userRequest,
-        categoryUpdateLogsRequest,
-        eventUpdateLogsRequest
-      ]);
-      if (res.some(({ status }) => status === 'rejected')) {
-        throw new Error();
-      }
-      await session.commitTransaction();
-    } catch {
-      await session.abortTransaction();
+      await session.withTransaction(async () => {
+        // create predictionset if it doesn't exist. means it's the first prediction the user has made for this event
+        if (!mostRecentPredictionSet) {
+          await db.collection<PredictionSet>('predictionsets').insertOne(
+            {
+              userId: new ObjectId(userId),
+              eventId: new ObjectId(eventId),
+              yyyymmdd,
+              // @ts-expect-error - This should only have partial data
+              categories: {
+                [categoryName]: {
+                  type: categoryType,
+                  phase: phaseUserIsPredicting,
+                  createdAt: new Date(),
+                  predictions
+                }
+              }
+            },
+            { session }
+          );
+          // else if predictionset exists for event, update it
+        } else {
+          const newCategory: iCategoryPrediction = {
+            createdAt: new Date(),
+            predictions
+          };
+          const requiresNewEntry =
+            yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
+          if (requiresNewEntry) {
+            const newPredictionSet: PredictionSet = {
+              ...stripId(mostRecentPredictionSet),
+              yyyymmdd,
+              categories: {
+                ...mostRecentPredictionSet.categories,
+                [categoryName]: newCategory
+              }
+            };
+            // create a copy of the most recent predictionset, but with a new yyyymmdd, and update the category
+            await db
+              .collection<PredictionSet>('predictionsets')
+              .insertOne(newPredictionSet, { session });
+          } else {
+            // update the current prediction set
+            await db.collection<PredictionSet>('predictionsets').updateOne(
+              { _id: mostRecentPredictionSet._id },
+              {
+                $set: {
+                  [`categories.${categoryName}`]: newCategory
+                }
+              },
+              { session }
+            );
+          }
+        }
+
+        // update user's recentPredictionSets
+        await db.collection<User>('users').updateOne(
+          {
+            _id: new ObjectId(userId)
+          },
+          { $set: { recentPredictionSets: userRecentPredictionSets } },
+          { session }
+        );
+
+        // update eventUpdateLogs - we'll use this to fill out a calendar of days where we made updates
+        await db.collection<EventUpdateLog>('eventupdatelogs').updateOne(
+          {
+            userId: new ObjectId(userId),
+            eventId: new ObjectId(eventId)
+          },
+          { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
+          { upsert: true, session } // useful the first time a user updates a category
+        );
+
+        // categoryUpdateLogs - useful if you want the calendar to be filled by category and not the event overall
+        await db.collection<CategoryUpdateLog>('categoryupdatelogs').updateOne(
+          {
+            userId: new ObjectId(userId),
+            eventId: new ObjectId(eventId),
+            category: categoryName
+          },
+          { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
+          { upsert: true, session } // useful the first time a user updates a category
+        );
+      });
+    } catch (e) {
+      console.error('error updating predictionset:', e);
       return {
         ...SERVER_ERROR.Error,
         message: `Error updating predictionset`
@@ -308,6 +279,14 @@ export const post = dbWrapper<
     } finally {
       await session.endSession();
     }
+    const endTime = performance.now();
+
+    // TODO: remove
+    console.log(
+      'setItemsInCache.all took ' +
+        (endTime - startTime).toString() +
+        ' milliseconds.'
+    );
 
     return {
       statusCode: 200
