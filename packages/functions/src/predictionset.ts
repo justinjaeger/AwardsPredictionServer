@@ -123,7 +123,7 @@ export const post = dbWrapper<
       };
     }
     const { awardsBody, year, nomDateTime } = event;
-    const { type: categoryType, shortlistDateTime } = category;
+    const { shortlistDateTime } = category;
 
     const phaseUserIsPredicting = getPhaseUserIsPredicting(
       event,
@@ -185,6 +185,10 @@ export const post = dbWrapper<
     // Important:: You must pass the session to all requests!!
     const session = client.startSession();
     try {
+      const newCategory: iCategoryPrediction = {
+        createdAt: new Date(),
+        predictions
+      };
       await session.withTransaction(async () => {
         // create predictionset if it doesn't exist. means it's the first prediction the user has made for this event
         if (!mostRecentPredictionSet) {
@@ -195,22 +199,13 @@ export const post = dbWrapper<
               yyyymmdd,
               // @ts-expect-error - This should only have partial data
               categories: {
-                [categoryName]: {
-                  type: categoryType,
-                  phase: phaseUserIsPredicting,
-                  createdAt: new Date(),
-                  predictions
-                }
+                [categoryName]: newCategory
               }
             },
             { session }
           );
           // else if predictionset exists for event, update it
         } else {
-          const newCategory: iCategoryPrediction = {
-            createdAt: new Date(),
-            predictions
-          };
           const requiresNewEntry =
             yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
           if (requiresNewEntry) {
