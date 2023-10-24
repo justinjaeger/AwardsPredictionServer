@@ -73,12 +73,14 @@ export const post = dbWrapper<
       return SERVER_ERROR.BadRequest;
     }
 
-    const apiDataField = await db
+    const apiDataWholeYearEntry = await db
       .collection<ApiData>('apidata')
       .findOne({ eventYear }, { projection: { [key]: 1 } });
 
+    const maybeExistingEntry = apiDataWholeYearEntry?.[key];
+
     // if doesn't exist in apiData, must create it
-    if (!apiDataField) {
+    if (!maybeExistingEntry) {
       let newApiData: Movie | Person | Song | undefined;
       if (categoryType === CategoryType.FILM) {
         const { data } = await Tmdb.getMovieAsDbType(movieTmdbId);
@@ -103,13 +105,15 @@ export const post = dbWrapper<
         };
       }
 
-      await db.collection<ApiData>('apidata').insertOne({
-        eventYear,
-        [key]: {
-          type: categoryType,
-          ...newApiData
-        }
-      });
+      await db.collection<ApiData>('apidata').findOneAndUpdate(
+        { eventYear },
+        {
+          $set: {
+            [key]: { ...newApiData, type: categoryType }
+          }
+        },
+        { upsert: true }
+      );
     }
 
     // at this point, the movie, person, and/or songs are created, and we can just attach them to the contender
