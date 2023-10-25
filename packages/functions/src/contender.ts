@@ -1,12 +1,10 @@
-import { ObjectId, type WithId } from 'mongodb';
+import { ObjectId, type UpdateFilter, type WithId } from 'mongodb';
 import Tmdb from './helper/tmdb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type CategoryName,
   CategoryType,
   type Contender,
-  type Movie,
-  type Person,
   type Song,
   type ApiData
 } from './types/models';
@@ -61,59 +59,70 @@ export const post = dbWrapper<
       };
     }
 
-    const key =
-      categoryType === CategoryType.FILM
-        ? movieTmdbId
-        : categoryType === CategoryType.PERFORMANCE
-        ? personTmdbId
-        : categoryType === CategoryType.SONG && songTitle
-        ? getSongKey(movieTmdbId, songTitle)
-        : undefined;
-    if (key === undefined) {
-      return SERVER_ERROR.BadRequest;
+    const movieKey = movieTmdbId.toString();
+    const personKey = personTmdbId?.toString();
+    const songKey = songTitle ? getSongKey(movieTmdbId, songTitle) : undefined;
+
+    const projection = { [movieKey]: 1 };
+    if (personKey) {
+      projection[personKey] = 1;
+    }
+    if (songKey) {
+      projection[songKey] = 1;
     }
 
     const apiDataWholeYearEntry = await db
       .collection<ApiData>('apidata')
-      .findOne({ eventYear }, { projection: { [key]: 1 } });
+      .findOne({ eventYear }, { projection });
 
-    const maybeExistingEntry = apiDataWholeYearEntry?.[key];
+    // INSERT API DATA
+    const maybeExistingMovie = apiDataWholeYearEntry?.[movieKey];
+    const maybeExistingPerson = personKey
+      ? apiDataWholeYearEntry?.[personKey]
+      : undefined;
+    const maybeExistingSong = songKey
+      ? apiDataWholeYearEntry?.[songKey]
+      : undefined;
 
-    // if doesn't exist in apiData, must create it
-    if (!maybeExistingEntry) {
-      let newApiData: Movie | Person | Song | undefined;
-      if (categoryType === CategoryType.FILM) {
-        const { data } = await Tmdb.getMovieAsDbType(movieTmdbId);
-        newApiData = data;
-      } else if (categoryType === CategoryType.PERFORMANCE && personTmdbId) {
-        const { data } = await Tmdb.getPersonAsDbType(personTmdbId);
-        newApiData = data;
-      } else if (categoryType === CategoryType.SONG && songTitle) {
-        const data: Song = {
-          movieTmdbId,
-          title: songTitle,
-          artist: songArtist ?? ''
-        };
-        newApiData = data;
-      }
-      if (!newApiData) {
+    const apiDataRequest = async (update: UpdateFilter<ApiData>) => {
+      await db
+        .collection<ApiData>('apidata')
+        .findOneAndUpdate({ eventYear }, { $set: update }, { upsert: true });
+    };
+
+    if (!maybeExistingMovie) {
+      const { data } = await Tmdb.getMovieAsDbType(movieTmdbId);
+      if (!data) {
         return {
           ...SERVER_ERROR.BadRequest,
-          message: `Tmdb could not provide data for ${
-            categoryType === CategoryType.FILM ? 'movie' : 'person'
-          }`
+          message: `Tmdb could not provide data for movie`
         };
       }
-
-      await db.collection<ApiData>('apidata').findOneAndUpdate(
-        { eventYear },
-        {
-          $set: {
-            [key]: { ...newApiData, type: categoryType }
-          }
-        },
-        { upsert: true }
-      );
+      await apiDataRequest({
+        [movieKey]: { ...data, type: CategoryType.FILM }
+      });
+    }
+    if (!maybeExistingPerson && personKey && personTmdbId) {
+      const { data } = await Tmdb.getPersonAsDbType(personTmdbId);
+      if (!data) {
+        return {
+          ...SERVER_ERROR.BadRequest,
+          message: `Tmdb could not provide data for person`
+        };
+      }
+      await apiDataRequest({
+        [personKey]: { ...data, type: CategoryType.PERFORMANCE }
+      });
+    }
+    if (!maybeExistingSong && songKey && songTitle) {
+      const data: Song = {
+        movieTmdbId,
+        title: songTitle,
+        artist: songArtist ?? ''
+      };
+      await apiDataRequest({
+        [songKey]: { ...data, type: CategoryType.SONG }
+      });
     }
 
     // at this point, the movie, person, and/or songs are created, and we can just attach them to the contender
