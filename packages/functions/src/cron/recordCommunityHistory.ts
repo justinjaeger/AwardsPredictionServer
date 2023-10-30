@@ -10,7 +10,8 @@ import {
   type EventModel,
   type PredictionSet,
   type iPrediction,
-  EventStatus
+  EventStatus,
+  type CategoryName
 } from 'src/types/models';
 
 /**
@@ -152,9 +153,20 @@ export const handler = dbWrapper(async ({ db }) => {
           numPredicting: rankings
         });
       }
+      // we want all the users WHO ARE PREDICTING THIS CATEGORY SPECIFICALLY
+      // so we need to filter out users who are predicting other categories
+      const usersPredictingThisCategory = predictionSets.filter((ps) => {
+        if (!ps) return false;
+        const categoryPrediction = ps.categories[categoryName as CategoryName];
+        if (!categoryPrediction) return false;
+        // don't record a prediction that's over 30 days old
+        if (categoryPrediction.createdAt < thirtyDaysAgo) return false;
+        return categoryPrediction.predictions.length > 0;
+      });
       categoryPredictions[categoryName] = {
         createdAt: new Date(),
-        predictions
+        predictions,
+        totalUsersPredicting: usersPredictingThisCategory.length
       };
     }
 
