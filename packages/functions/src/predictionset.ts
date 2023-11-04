@@ -109,21 +109,30 @@ export const post = dbWrapper<
     const userId = authenticatedUserId;
 
     // get the category for the most recent phase
-    const event = await db
-      .collection<EventModel>('events')
-      .findOne(
-        { _id: new ObjectId(eventId) },
-        { projection: { [`categories.${categoryName}`]: 1 } }
-      );
-    const category = event?.categories[categoryName];
-    if (!category) {
+    const event = await db.collection<EventModel>('events').findOne(
+      { _id: new ObjectId(eventId) },
+      {
+        projection: {
+          awardsBody: 1,
+          year: 1,
+          status: 1,
+          liveAt: 1,
+          nomDateTime: 1,
+          winDateTime: 1,
+          [`categories.${categoryName}`]: 1
+        }
+      }
+    );
+
+    const categoryData = event?.categories[categoryName];
+    if (!categoryData) {
       return {
         ...SERVER_ERROR.BadRequest,
         message: `Category ${categoryName} not found on event`
       };
     }
     const { awardsBody, year, nomDateTime } = event;
-    const { shortlistDateTime } = category;
+    const { shortlistDateTime } = categoryData;
 
     const phaseUserIsPredicting = getPhaseUserIsPredicting(
       event,
@@ -165,8 +174,16 @@ export const post = dbWrapper<
         { _id: new ObjectId(userId) },
         { projection: { recentPredictionSets: 1 } }
       );
-    const userRecentPredictionSets = user?.recentPredictionSets ?? [];
-    // note: The TOP predictions should be at the FRONT of the array
+    let userRecentPredictionSets = user?.recentPredictionSets ?? [];
+    // get rid of other same predictions for this category
+    userRecentPredictionSets = userRecentPredictionSets.filter((ps) => {
+      const isTheSameAsNewCategory =
+        ps.category === categoryName &&
+        ps.year === year &&
+        ps.awardsBody === awardsBody;
+      return !isTheSameAsNewCategory;
+    });
+    // Put new predictions at top (the most recent)
     userRecentPredictionSets.unshift({
       awardsBody,
       year,
@@ -177,9 +194,11 @@ export const post = dbWrapper<
         .sort((a, b) => a.ranking - b.ranking)
         .slice(0, 5)
     });
-    if (userRecentPredictionSets?.length > RECENT_PREDICTION_SETS_TO_SHOW) {
-      userRecentPredictionSets.pop();
-    }
+    // only store the most recent 5
+    userRecentPredictionSets = userRecentPredictionSets.slice(
+      0,
+      RECENT_PREDICTION_SETS_TO_SHOW
+    );
 
     // atomically execute all requests
     // Important:: You must pass the session to all requests!!
