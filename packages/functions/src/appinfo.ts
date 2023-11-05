@@ -3,8 +3,8 @@ import { type AppInfo } from './types/models';
 
 export const get = dbWrapper<null, AppInfo>(async ({ db }) => {
   const res = await db
-    .collection<AppInfo>('appInfo')
-    .find()
+    .collection<AppInfo>('appinfo')
+    .find({})
     .project({ _id: 0 })
     .toArray();
 
