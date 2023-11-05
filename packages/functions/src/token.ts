@@ -90,7 +90,7 @@ export const remove = dbWrapper<{ token: string }, string>(
     if (!token) {
       return {
         ...SERVER_ERROR.BadRequest,
-        message: 'Missing body properties'
+        message: 'Missing path property: token'
       };
     }
 

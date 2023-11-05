@@ -174,7 +174,7 @@ export type iPrediction = {
   personTmdbId?: number;
   songId?: string;
   numPredicting?: Record<number, number>; // only applies to community predictions
-};
+}; 
 
 export type iCategoryPrediction = {
   createdAt: Date;
