@@ -5,12 +5,13 @@ import { getContenderPoints } from 'src/helper/getContenderPoints';
 import { shouldLogPredictionsAsTomorrow } from 'src/helper/shouldLogPredictionsAsTomorrow';
 import { dateToYyyymmdd, getDate } from 'src/helper/utils';
 import { dbWrapper } from 'src/helper/wrapper';
-import { EventStatus } from 'src/types/enums';
 import {
   type iCategoryPrediction,
   type EventModel,
   type PredictionSet,
-  type iPredictions
+  type iPrediction,
+  EventStatus,
+  type CategoryName
 } from 'src/types/models';
 
 /**
@@ -60,9 +61,9 @@ export const handler = dbWrapper(async ({ db }) => {
     // also get contender info to link to contenderId... this is needed to display the community prediction
     const contenderInfo: {
       [contenderId: string]: {
-        movieId: ObjectId;
-        personId?: ObjectId;
-        songId?: ObjectId;
+        movieTmdbId: number;
+        personTmdbId?: number;
+        songId?: string;
       };
     } = {};
     console.log('1');
@@ -75,8 +76,8 @@ export const handler = dbWrapper(async ({ db }) => {
         // don't record a prediction that's over 30 days old
         if (createdAt < thirtyDaysAgo) continue;
         for (const {
-          movieId,
-          personId,
+          movieTmdbId,
+          personTmdbId,
           songId,
           contenderId: contenderObjectId,
           ranking
@@ -88,8 +89,8 @@ export const handler = dbWrapper(async ({ db }) => {
           if (!numPredicting[categoryName][contenderId]) {
             // first time we encounter the contenderId, fill in this info
             contenderInfo[contenderId] = {
-              movieId,
-              personId,
+              movieTmdbId,
+              personTmdbId,
               songId
             };
             numPredicting[categoryName][contenderId] = {};
@@ -104,51 +105,68 @@ export const handler = dbWrapper(async ({ db }) => {
 
     console.log('2');
     // tally up points for each contenderId. this is used to sort the contenders
-    const pointsPerContenderId: { [contenderId: string]: number } = {};
+    const pointsPerContenderId: {
+      [categoryName: string]: { [contenderId: string]: number };
+    } = {};
     for (const categoryName of Object.keys(categories)) {
       if (!numPredicting[categoryName]) continue;
+      if (!pointsPerContenderId[categoryName]) {
+        pointsPerContenderId[categoryName] = {};
+      }
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
-        pointsPerContenderId[contenderId] = getContenderPoints(rankings);
+        pointsPerContenderId[categoryName][contenderId] =
+          getContenderPoints(rankings);
       }
     }
     console.log('3');
-    const sortedContenderIds = Object.entries(pointsPerContenderId)
-      .sort(([, a], [, b]) => {
-        // this will sort so the largest number comes first in the list
-        if (a > b) return -1;
-        if (a < b) return 1;
-        return 0;
-      })
-      .map(([contenderId]) => contenderId);
+    const getSortedContenderIds = (categoryName: string) =>
+      Object.entries(pointsPerContenderId[categoryName])
+        .sort(([, a], [, b]) => {
+          // this will sort so the largest number comes first in the list
+          if (a > b) return -1;
+          if (a < b) return 1;
+          return 0;
+        })
+        .map(([contenderId]) => contenderId);
 
     console.log('4');
     // format the "categories" field on PredictionSet
     const categoryPredictions: {
       [categoryName: string]: iCategoryPrediction;
     } = {};
-    for (const [categoryName, { type, phase }] of Object.entries(categories)) {
+    for (const categoryName of Object.keys(categories)) {
       // we need numPredicting amount of predictions for each category
-      const predictions: iPredictions = [];
+      const predictions: iPrediction[] = [];
       if (!numPredicting[categoryName]) continue;
+      const sortedContenderIds = getSortedContenderIds(categoryName);
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
         // get the actual list ranking
         const ranking = sortedContenderIds.indexOf(contenderId) + 1;
         predictions.push({
-          ...contenderInfo[contenderId], // contains movieId, personId, songId
+          ...contenderInfo[contenderId], // contains movieTmdbId, personTmdbId, songId
           contenderId: new ObjectId(contenderId),
           ranking,
           numPredicting: rankings
         });
       }
+      // we want all the users WHO ARE PREDICTING THIS CATEGORY SPECIFICALLY
+      // so we need to filter out users who are predicting other categories
+      const usersPredictingThisCategory = predictionSets.filter((ps) => {
+        if (!ps) return false;
+        const categoryPrediction = ps.categories[categoryName as CategoryName];
+        if (!categoryPrediction) return false;
+        // don't record a prediction that's over 30 days old
+        if (categoryPrediction.createdAt < thirtyDaysAgo) return false;
+        return categoryPrediction.predictions.length > 0;
+      });
       categoryPredictions[categoryName] = {
-        type,
-        phase,
         createdAt: new Date(),
-        predictions
+        predictions,
+        totalUsersPredicting: usersPredictingThisCategory.length
       };
     }
 

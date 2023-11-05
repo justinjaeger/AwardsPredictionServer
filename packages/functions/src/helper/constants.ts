@@ -1,4 +1,4 @@
-import { AwardsBody, CategoryName, CategoryType } from 'src/types/enums';
+import { AwardsBody, CategoryName, CategoryType } from 'src/types/models';
 
 export const COMMUNITY_USER_ID = 'community';
 export const DEFAULT_PAGINATE_LIMIT = 10;

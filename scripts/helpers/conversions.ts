@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { AmplifyAwardsBody, AmplifyCategoryName, AmplifyCategoryType, AmplifyContender, AmplifyContenderVisibility, AmplifyEvent, AmplifyEventStatus, AmplifyMovie, AmplifyPerson, AmplifyPrediction, AmplifyPredictionSet, AmplifySong, AmplifyUser, AmplifyUserRole } from "../types/amplifyApi.ts";
-import { AwardsBody, CategoryName, CategoryType, EventStatus, MongoContender, MongoEventModel, MongoMovie, MongoPredictionSet, MongoRelationship, MongoSong, MongoUser, UserRole, iCategoryPrediction } from "../types/mongoApi.ts";
+import { AwardsBody, CategoryName, CategoryType, Contender, EventModel, EventStatus, Movie, Person, PredictionSet, Relationship, Song, User, UserRole, iCategoryPrediction } from "../types/mongoApi.ts";
 
 export const amplifyRoleToMongoRole = (role: AmplifyUserRole): UserRole => {
     switch (role) {
@@ -32,8 +32,8 @@ export const amplifyCategoryNameToMongoCategoryName = (type: AmplifyCategoryName
 // I have to create user FIRST, so how am I going to get the predictionsets first? It's circular
 export const convertUser = (
     user: AmplifyUser,
-): MongoUser => {
-    const obj: MongoUser = {
+): User => {
+    const obj: User = {
         amplify_id: user.id,
         email: user.email,
         name: user.name || undefined,
@@ -46,22 +46,9 @@ export const convertUser = (
     return obj;
 }
 
-export const convertRelationship = (
-    amplifyRelationshipId: string,
-    mongoFollowedUserId: ObjectId, // have to get this first
-    mongoFollowingUserId: ObjectId
-
-): MongoRelationship => {
-    return {
-        amplify_id: amplifyRelationshipId,
-        followedUserId: mongoFollowedUserId,
-        followingUserId: mongoFollowingUserId,
-    }
-}
-
 export const convertEvent = (
     amplifyEvent: AmplifyEvent,
-): MongoEventModel => {
+): EventModel => {
     return {
         amplify_id: amplifyEvent.id,
         awardsBody: amplifyAwardsBodyToMongoAwardsBody(amplifyEvent.awardsBody),
@@ -79,7 +66,7 @@ export const convertEvent = (
 // Movie, Person, the cron func fills in the rest of the info
 export const convertMovie = (
     amplifyMovie: AmplifyMovie,
-): MongoMovie => {
+): Movie => {
     return {
         amplify_id: amplifyMovie.id,
         tmdbId: amplifyMovie.tmdbId,
@@ -89,7 +76,7 @@ export const convertMovie = (
 }
 export const convertPerson = (
     amplifyPerson: AmplifyPerson,
-): MongoMovie => {
+): Person => {
     return {
         amplify_id: amplifyPerson.id,
         tmdbId: amplifyPerson.tmdbId,
@@ -100,40 +87,42 @@ export const convertPerson = (
 // Must be done after Movie
 export const convertSong = (
     amplifySong: AmplifySong,
-    mongoMovieId: ObjectId,
-): MongoSong => {
+    movieTmdbId: number,
+): Song => {
     return {
         amplify_id: amplifySong.id,
         title: amplifySong.title,
-        movieId: mongoMovieId,
+        movieTmdbId,
     }
 }
 
 
 export const convertContender = (
     amplifyContender: AmplifyContender,
-    mongoMovieId: ObjectId,
     mongoEventId: ObjectId,
     categoryName: CategoryName,
-    songId?: ObjectId,
-    personId?: ObjectId,
-): MongoContender => {
+    tmdbMovieId: number,
+    tmdbPersonId?: number,
+    songId?: string,
+): Contender => {
     const isHidden = amplifyContender.visibility === AmplifyContenderVisibility.HIDDEN ? true : false;
     return {
         amplify_id: amplifyContender.id,
-        movieId: mongoMovieId,
+        movieTmdbId: tmdbMovieId,
         eventId: mongoEventId,
         category: categoryName,
         isHidden,
         songId,
-        personId,
+        personTmdbId: tmdbPersonId,
     }
 }
 
 export const dateToYyyymmdd = (date: Date) => {
-  return parseInt(
-    `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`
-  );
+  const str =
+    date.getFullYear().toString() +
+    ('0' + (date.getMonth() + 1).toString()).slice(-2) +
+    ('0' + date.getDate().toString()).slice(-2);
+  return parseInt(str);
 };
 
 export const convertPredictionSet = (
@@ -143,8 +132,8 @@ export const convertPredictionSet = (
     mongoEventId: ObjectId,
     amplifyCategoryIdToCategory: {[amplifyCategoryId: string]: { type: CategoryType, name: CategoryName }},
     amplifyContenderIdToMongoContenderId: {[amplifyContenderId: string]: ObjectId},
-    amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: MongoContender},
-): MongoPredictionSet => {
+    amplifyContenderIdToMongoContender: {[amplifyContenderId: string]: Contender},
+): PredictionSet => {
     let latestYyyymmdd = 0;
     // creates the categories object on the predictionset
     const categories = amplifyPredictionSets.reduce((acc, predictionSet)=>{
@@ -153,18 +142,17 @@ export const convertPredictionSet = (
         const { name, type } = amplifyCategoryIdToCategory[predictionSet.categoryId];
         const predictionsInSet = amplifyPredictions.filter((prediction)=>prediction.predictionSetId === predictionSet.id);
         const predictions = predictionsInSet.map((prediction)=>{
-            const { movieId, personId, songId } = amplifyContenderIdToMongoContender[prediction.contenderId];
+            const { movieTmdbId, personTmdbId, songId } = amplifyContenderIdToMongoContender[prediction.contenderId];
             const contenderId = amplifyContenderIdToMongoContenderId[prediction.contenderId];
             return {
                 contenderId,
                 ranking: prediction.ranking,
-                movieId,
-                personId,
+                movieTmdbId,
+                personTmdbId,
                 songId,
             }
         })
         acc[name] = {
-            type: type,
             createdAt: new Date(predictionSet.createdAt),
             predictions,
         }

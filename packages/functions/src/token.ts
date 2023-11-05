@@ -12,7 +12,7 @@ import { SERVER_ERROR } from './types/responses';
 export const get = dbWrapper<{}, string>(async ({ db, event }) => {
   // the wrapper isn't going to let the refresh token pass, so handle it here
 
-  const refreshToken = event?.headers?.Authorization?.split(' ')[1];
+  const refreshToken = event?.headers?.authorization?.split(' ')?.[1];
   if (!refreshToken) {
     return {
       ...SERVER_ERROR.BadRequest,
@@ -37,9 +37,11 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
     return SERVER_ERROR.RevokeAccess;
   }
 
+  const newAccessToken = Jwt.createAccessToken(userId);
+
   return {
     statusCode: 200,
-    data: Jwt.createAccessToken(userId)
+    data: newAccessToken
   };
 });
 
@@ -55,27 +57,35 @@ export const post = dbWrapper<{}, string>(
 
     const refreshToken = Jwt.createRefreshToken(authenticatedUserId);
 
-    const tokens = db.collection<Token>('tokens');
-    await tokens.insertOne({
-      userId: new ObjectId(authenticatedUserId),
-      token: refreshToken
-    });
-
-    return {
-      statusCode: 200,
-      data: refreshToken
-    };
+    try {
+      // upserting just in case this token already exists
+      await db.collection<Token>('tokens').findOneAndUpdate(
+        { token: refreshToken },
+        {
+          $set: {
+            userId: new ObjectId(authenticatedUserId),
+            token: refreshToken
+          }
+        },
+        { upsert: true }
+      );
+      return {
+        statusCode: 200,
+        data: refreshToken
+      };
+    } catch (e) {
+      console.error('error creating refresh token', e);
+      return SERVER_ERROR.ServerError;
+    }
   }
 );
 
 /**
- * Deletes a single refresh token (used on log out)
+ * Deletes a refresh token
  */
-export const remove = dbWrapper<undefined, string>(
-  async ({ db, params: { token }, authenticatedUserId: userId }) => {
-    if (!userId) {
-      return SERVER_ERROR.Unauthenticated;
-    }
+export const remove = dbWrapper<{ token: string }, string>(
+  async ({ db, params: { token } }) => {
+    const tokens = db.collection<Token>('tokens');
 
     if (!token) {
       return {
@@ -84,34 +94,31 @@ export const remove = dbWrapper<undefined, string>(
       };
     }
 
-    const tokens = db.collection<Token>('tokens');
-
-    await tokens.deleteOne({ token });
-
-    return { statusCode: 200 };
+    try {
+      await tokens.deleteOne({ token });
+      return { statusCode: 200 };
+    } catch (e) {
+      return SERVER_ERROR.ServerError;
+    }
   }
 );
 
 /**
- * Deletes all user tokens associated with authed user
+ * Removes all tokens associated with a user
  */
-export const removeUserTokens = dbWrapper<undefined, string>(
+export const removeAll = dbWrapper<{ token: string }, string>(
   async ({ db, authenticatedUserId: userId }) => {
     if (!userId) {
       return SERVER_ERROR.Unauthenticated;
     }
 
-    if (!userId) {
-      return {
-        ...SERVER_ERROR.BadRequest,
-        message: 'Missing path property: userId'
-      };
-    }
-
     const tokens = db.collection<Token>('tokens');
 
-    await tokens.deleteMany({ userId: new ObjectId(userId) });
-
-    return { statusCode: 200 };
+    try {
+      await tokens.deleteMany({ userId: new ObjectId(userId) });
+      return { statusCode: 200 };
+    } catch (e) {
+      return SERVER_ERROR.ServerError;
+    }
   }
 );

@@ -29,15 +29,18 @@ export function ApiStack({ stack }: StackContext) {
           JWT_SECRET: process.env.JWT_SECRET || '',
           TMDB_API_KEY: process.env.TMDB_API_KEY || '',
           SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+          S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID || '',
+          S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY || '',
         },
       },
     },
     routes: {
       // GET
       "GET /": `${PATH}/test.get`, // for testing
-      "GET /users/{userId}": `${PATH}/user.get`,
+      "GET /users": `${PATH}/user.get`,
       "GET /users/{userId}/following": `${PATH}/user.listFollowings`,
       "GET /users/{userId}/followers": `${PATH}/user.listFollowers`,
+      "GET /users/mostFollowed": `${PATH}/user.listMostFollowed`,
       "GET /users/search": `${PATH}/user.search`,
       "GET /relationships/{followingUserId}/{followedUserId}": `${PATH}/relationship.get`,
       "GET /tokens": `${PATH}/token.get`, // uses payload from refreshToken
@@ -47,22 +50,22 @@ export function ApiStack({ stack }: StackContext) {
       "GET /jwt": `${PATH}/jwt.get`,
       "GET /email/send": `${PATH}/email.send`,
       "GET /email/verify": `${PATH}/email.verify`,
-      // (fake post requests)
-      "POST /movies": `${PATH}/movie.getBatch`,
-      "POST /persons": `${PATH}/movie.getBatch`,
-      "POST /songs": `${PATH}/movie.getBatch`,
+      "GET /apidata": `${PATH}/apidata.get`,
+      "GET /appinfo": `${PATH}/appinfo.get`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
       "POST /relationships": `${PATH}/relationship.post`,
       "POST /tokens": `${PATH}/token.post`,
       "POST /predictionsets": `${PATH}/predictionset.post`,
       "POST /contenders": `${PATH}/contender.post`,
+      "POST /image": `${PATH}/storage.post`,
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
       "DELETE /relationships/{followedUserId}": `${PATH}/relationship.remove`,
-      "DELETE /tokens/{token}": `${PATH}/token.remove`, // delete token
-      "DELETE /tokens/user": `${PATH}/token.removeUserTokens`, // delete tokens associated with user
+      "DELETE /tokens/{token}": `${PATH}/token.remove`,
+      "DELETE /tokens/user": `${PATH}/token.removeAll`,
+      "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
     },
   });
 
