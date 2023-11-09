@@ -172,7 +172,7 @@ export const post = dbWrapper<
       .collection<User>('users')
       .findOne(
         { _id: new ObjectId(userId) },
-        { projection: { recentPredictionSets: 1 } }
+        { projection: { recentPredictionSets: 1, eventsPredicting: 1 } }
       );
     let userRecentPredictionSets = user?.recentPredictionSets ?? [];
     // get rid of other same predictions for this category
@@ -199,6 +199,16 @@ export const post = dbWrapper<
       0,
       RECENT_PREDICTION_SETS_TO_SHOW
     );
+
+    // update the user's eventsPredicting
+    const userEventsPredicting = user?.eventsPredicting ?? {};
+    // add categoryName to eventsPredicting
+    userEventsPredicting[eventId] = [
+      ...(userEventsPredicting[eventId] ?? []).filter(
+        (c) => c !== categoryName
+      ),
+      categoryName
+    ];
 
     // atomically execute all requests
     // Important:: You must pass the session to all requests!!
@@ -259,7 +269,12 @@ export const post = dbWrapper<
           {
             _id: new ObjectId(userId)
           },
-          { $set: { recentPredictionSets: userRecentPredictionSets } },
+          {
+            $set: {
+              recentPredictionSets: userRecentPredictionSets,
+              eventsPredicting: userEventsPredicting
+            }
+          },
           { session }
         );
 

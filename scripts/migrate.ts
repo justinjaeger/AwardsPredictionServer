@@ -449,7 +449,12 @@ async function handler() {
                     topPredictions: category.predictions.sort((a, b) => a.ranking - b.ranking).slice(0,5),
                 }
             })
-            const eventsPredicting = fiveMostRecentPredictions.length > 0 ? [mongoDbEventId] : [];
+            const allCategoriesPredicting = Object.entries(mongoDbPredictionSet.categories)
+                .filter(([,catData])=>catData.predictions.length > 0)
+                .map(([categoryName])=>categoryName);
+            const eventsPredicting = allCategoriesPredicting.length > 0 ? {
+                [mongoDbEventId.toString()]: allCategoriesPredicting
+            }: {};
             const followingCount = amplifyUserIdToData[amplifyUserId].followingCount;
             const followerCount = amplifyUserIdToData[amplifyUserId].followerCount;
             userNestedFieldReqs.push(

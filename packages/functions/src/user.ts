@@ -310,7 +310,7 @@ export const remove = dbWrapper<Partial<User>, {}>(
         $set: {
           followerCount: 0,
           followingCount: 0,
-          eventsPredicting: [],
+          eventsPredicting: {},
           recentPredictionSets: [],
           role: UserRole.USER
         }
