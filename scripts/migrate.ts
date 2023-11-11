@@ -16,6 +16,7 @@ import connectDynamoDB from "./helpers/connectDynamoDB.ts";
 import connectMongoDB from "./helpers/connectMongoDB.ts";
 import { ApiData, CategoryName, CategoryType, Contender, EventModel, PredictionSet, Relationship, User, iCategory, iCategoryPrediction, iPrediction, iRecentPrediction } from "types/mongoApi.ts";
 import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCategoryType, convertEvent, convertMovie, convertPerson, convertSong, convertUser, dateToYyyymmdd } from "./helpers/conversions.ts";
+import _ from 'lodash';
 
 /**
  * Documentation, all dynamodb commands:
@@ -78,7 +79,7 @@ const predictionSetTable = 'PredictionSet-jrjijr2sgbhldoizdkwwstdpn4-prod'
  * - too risky to keep this around
  */
 // NOTE: If last set of data was inaccurate, should delete all predictionsets before running
-const getResId = (res:any): ObjectId => res.value?._id || res.lastErrorObject?.upserted;
+const getResId = (res:any): ObjectId => res?.value?._id ?? res.lastErrorObject?.upserted;
 
 async function handler() {
     console.log('STARTING...')
@@ -338,8 +339,6 @@ async function handler() {
             // get predictionsets where userId and eventId match
             const filteredPredictionSets = predictionSetItems.filter((predictionSet)=>predictionSet.eventId === amplifyEventId && predictionSet.userId === amplifyUserId);
             if (filteredPredictionSets.length === 0) {
-                // create a bogus promise so that the below loop doesn't break - we need the index to match
-                predictionSetReqs.push(Promise.resolve())
                 continue;
             };
             /**
@@ -425,38 +424,51 @@ async function handler() {
         }
         console.log('inserting predictionsets...')
         const predictionSetRes = await Promise.all(predictionSetReqs);
+        
+        console.log('getting predictionsets we just inserted...')
+        const predictionSetIds = predictionSetRes.map((res)=> res && getResId(res));
+        const getPredictionSetRequests: Promise<WithId<PredictionSet> | null>[] = [];
+        for (const pId of predictionSetIds) {
+            if (!pId) continue;
+            getPredictionSetRequests.push(mongodb.collection<PredictionSet>('predictionsets').findOne({ _id: pId }));
+        }
+        const mongoDbPredictionSets = await Promise.all(getPredictionSetRequests);
+
         console.log('done inserting predictionsets.')
         const userNestedFieldReqs = [];
-        for (let i in predictionSetRes) {
-            const res = predictionSetRes[i];
-            if (!res) continue; // because some promises are bogus
-            const amplifyUserId = userItems[i].id;
+        for (const amplifyUser of userItems) {
+            const amplifyUserId = amplifyUser.id;
             const mongoDbUserId = amplifyUserIdToData[amplifyUserId].mongoId;
-            const predictionSetId = getResId(res);
-            const mongoDbPredictionSet = amplifyIdToMongoPredictionSet[amplifyUserId];
-            const iterableCategories = Object.entries(mongoDbPredictionSet.categories);
-            // NOTE: this should be, most recent at the FRONT, least at the BACK
-            iterableCategories.sort(([,p1], [,p2]) => p2.createdAt.getTime() - p1.createdAt.getTime());
-            const fiveMostRecentPredictions: iRecentPrediction[] = iterableCategories.slice(0,5).map(([categoryName, category])=>{
-                const { awardsBody, year } = amplifyEventIdToMongoEvent[amplifyEventId];
-                return {
-                    awardsBody,
-                    year,
-                    category: categoryName,
-                    predictionSetId,
-                    createdAt: category.createdAt,
-                    // NOTE: this should be, highest ranked at the FRONT, least at the BACK
-                    topPredictions: category.predictions.sort((a, b) => a.ranking - b.ranking).slice(0,5),
-                }
-            })
-            const allCategoriesPredicting = Object.entries(mongoDbPredictionSet.categories)
-                .filter(([,catData])=>catData.predictions.length > 0)
-                .map(([categoryName])=>categoryName);
-            const eventsPredicting = allCategoriesPredicting.length > 0 ? {
-                [mongoDbEventId.toString()]: allCategoriesPredicting
-            }: {};
             const followingCount = amplifyUserIdToData[amplifyUserId].followingCount;
             const followerCount = amplifyUserIdToData[amplifyUserId].followerCount;
+
+            // don't loop in here... find the prediction set associated with the user
+            const mongoDbPredictionSet = mongoDbPredictionSets.find((res)=> _.isEqual(res?.userId, mongoDbUserId));
+            let fiveMostRecentPredictions: iRecentPrediction[] = [];
+            let eventsPredicting = {};
+            if (mongoDbPredictionSet) {
+                const iterableCategories = Object.entries(mongoDbPredictionSet.categories);
+                // NOTE: this should be, most recent at the FRONT, least at the BACK
+                iterableCategories.sort(([,p1], [,p2]) => p2.createdAt.getTime() - p1.createdAt.getTime());
+                fiveMostRecentPredictions = iterableCategories.slice(0,5).map(([categoryName, category])=>{
+                    const { awardsBody, year } = amplifyEventIdToMongoEvent[amplifyEventId];
+                    return {
+                        awardsBody,
+                        year,
+                        category: categoryName,
+                        predictionSetId: mongoDbPredictionSet._id,
+                        createdAt: category.createdAt,
+                        // NOTE: this should be, highest ranked at the FRONT, least at the BACK
+                        topPredictions: category.predictions.sort((a, b) => a.ranking - b.ranking).slice(0,5),
+                    }
+                })
+                const allCategoriesPredicting = Object.entries(mongoDbPredictionSet.categories)
+                    .filter(([,catData])=>catData.predictions.length > 0)
+                    .map(([categoryName])=>categoryName);
+                eventsPredicting = allCategoriesPredicting.length > 0 ? {
+                    [mongoDbEventId.toString()]: allCategoriesPredicting
+                }: {};
+            }
             userNestedFieldReqs.push(
                 mongodb.collection<User>('users').updateOne(
                     { _id: mongoDbUserId },
