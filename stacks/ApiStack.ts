@@ -78,6 +78,7 @@ export function ApiStack({ stack }: StackContext) {
                 TMDB_API_KEY: process.env.TMDB_API_KEY ?? '',
             },
             handler: `${PATH}/cron/updateTmdb.handler`,
+            timeout: "10 minutes"
         }
     },
   });
@@ -90,6 +91,7 @@ export function ApiStack({ stack }: StackContext) {
                 MONGODB_URI,
             },
             handler: `${PATH}/cron/recordCommunityHistory.handler`,
+            timeout: "5 minutes"
         }
     },
   });
