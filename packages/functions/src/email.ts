@@ -19,7 +19,7 @@ export const send = dbWrapper<undefined, string>(
     const link = createEmailLink(token, email);
     console.log('verification link:', link);
 
-    const hasSentSuccessfully = await Sendgrid.sendEmail(email, link);
+    const hasSentSuccessfully = await Sendgrid.sendEmail(email, token);
 
     if (hasSentSuccessfully) {
       return {

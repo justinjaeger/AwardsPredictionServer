@@ -1,12 +1,15 @@
 import sgMail from '@sendgrid/mail';
+import { createRedirectLink } from './emailLink';
 
-const sendEmail = async (email: string, link: string): Promise<boolean> => {
+const sendEmail = async (email: string, token: string): Promise<boolean> => {
   console.log('EMAIL:', email);
-  console.log('LINK:', link);
+  console.log('TOKEN:', token);
 
   sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? ''); // important
 
   const SENDER = 'noreply@oscarexpert.com';
+
+  const url = createRedirectLink(token, email);
 
   const msg = {
     to: email, // Change to your recipient
@@ -17,17 +20,12 @@ const sendEmail = async (email: string, link: string): Promise<boolean> => {
             <h3 style="color: #1F1F1F; margin-bottom: 5px;">
                 Click to verify your account
             </h3>
-            <a href=${link}>
+            <a href="${url}">
                 <button style="background-color: #c48900; color: white; font-weight: 700; border: none; border-radius: 5px; padding: 10px 20px; cursor: pointer;">
                     Verify Account
                 </button>
             </a>
-            <body style="color: #5E5E5E; margin-top: 20px;">
-                You must verify on the same device you signed up on.
-            </body>
-            <body style="color: #5E5E5E;">
-                If you did not sign up for Award Expert, please ignore this email.
-            </body>
+            ${url}
         </div>
     `
   };
