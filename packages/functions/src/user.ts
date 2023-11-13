@@ -308,7 +308,9 @@ export const remove = dbWrapper<Partial<User>, {}>(
           followingCount: 0,
           eventsPredicting: {},
           recentPredictionSets: [],
-          role: UserRole.USER
+          role: UserRole.USER,
+          name: '',
+          username: ''
         }
       }
     );
