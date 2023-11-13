@@ -280,26 +280,22 @@ export const put = dbWrapper<Partial<User>, {}>(
 );
 
 export const remove = dbWrapper<Partial<User>, {}>(
-  async ({ db, authenticatedUserId, params, client }) => {
-    const { userId } = params;
+  async ({ db, authenticatedUserId, client }) => {
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;
-    }
-    if (!userId) {
-      return SERVER_ERROR.BadRequest;
     }
 
     const removeUserRelationshipsRequest = db
       .collection<Relationship>('relationships')
       .deleteMany({
         $or: [
-          { followingUserId: new ObjectId(userId) },
-          { followedUserId: new ObjectId(userId) }
+          { followingUserId: new ObjectId(authenticatedUserId) },
+          { followedUserId: new ObjectId(authenticatedUserId) }
         ]
       });
 
     const removeUserTokensRequest = db.collection<Token>('tokens').deleteMany({
-      userId: new ObjectId(userId)
+      userId: new ObjectId(authenticatedUserId)
     });
 
     const removeUserDataRequest = db.collection<User>('users').updateOne(
@@ -319,18 +315,12 @@ export const remove = dbWrapper<Partial<User>, {}>(
 
     const session = client.startSession();
     try {
-      session.startTransaction();
-      const res = await Promise.allSettled([
-        removeUserRelationshipsRequest,
-        removeUserTokensRequest,
-        removeUserDataRequest
-      ]);
-      if (res.some(({ status }) => status === 'rejected')) {
-        throw new Error();
-      }
-      await session.commitTransaction();
+      await session.withTransaction(async () => {
+        await removeUserRelationshipsRequest;
+        await removeUserTokensRequest;
+        await removeUserDataRequest;
+      });
     } catch {
-      await session.abortTransaction();
       return {
         ...SERVER_ERROR.Error,
         message: `Error deleting user`
