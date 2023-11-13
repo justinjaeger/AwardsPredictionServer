@@ -184,16 +184,18 @@ export const post = dbWrapper<
       return !isTheSameAsNewCategory;
     });
     // Put new predictions at top (the most recent)
-    userRecentPredictionSets.unshift({
-      awardsBody,
-      year,
-      category: categoryName,
-      createdAt: new Date(),
-      predictionSetId: new ObjectId(),
-      topPredictions: predictions
-        .sort((a, b) => a.ranking - b.ranking)
-        .slice(0, 5)
-    });
+    if (predictions.length > 0) {
+      userRecentPredictionSets.unshift({
+        awardsBody,
+        year,
+        category: categoryName,
+        createdAt: new Date(),
+        predictionSetId: new ObjectId(),
+        topPredictions: predictions
+          .sort((a, b) => a.ranking - b.ranking)
+          .slice(0, 5)
+      });
+    }
     // only store the most recent 5
     userRecentPredictionSets = userRecentPredictionSets.slice(
       0,
