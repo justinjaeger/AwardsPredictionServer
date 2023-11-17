@@ -3,11 +3,16 @@ import Jwt from './helper/jwt';
 import { SERVER_ERROR } from './types/responses';
 import Sendgrid from './helper/sendgrid';
 import { createEmailLink, parseEmailLink } from './helper/emailLink';
+import { MongoClient } from 'mongodb';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Sends verification email
  */
 export const send = dbWrapper<undefined, string>(
+  client,
   async ({ params: { email } }) => {
     if (!email) {
       return {
@@ -39,6 +44,7 @@ export const send = dbWrapper<undefined, string>(
  * link looks like: oscar://signin/?token={jwt}
  */
 export const verify = dbWrapper<undefined, string>(
+  client,
   async ({ params: { link } }) => {
     if (!link) {
       return {

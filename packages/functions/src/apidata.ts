@@ -1,7 +1,10 @@
-import { type WithId } from 'mongodb';
+import { MongoClient, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type ApiData } from './types/models';
 import { SERVER_ERROR } from './types/responses';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Gets a batch of movie data,
@@ -9,6 +12,7 @@ import { SERVER_ERROR } from './types/responses';
  * Fake POST request so I can use the body
  */
 export const get = dbWrapper<undefined, WithId<ApiData> | null>(
+  client,
   async ({ db, params: { eventYear } }) => {
     if (!eventYear) {
       return {

@@ -1,15 +1,18 @@
-import { ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { type Token } from './types/models';
 import Jwt from './helper/jwt';
 import { SERVER_ERROR } from './types/responses';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Pass refresh token in header
  * Validates refresh token and check it against the db
  * If exists in db, it sends back a new access token
  */
-export const get = dbWrapper<{}, string>(async ({ db, event }) => {
+export const get = dbWrapper<{}, string>(client, async ({ db, event }) => {
   // the wrapper isn't going to let the refresh token pass, so handle it here
 
   const refreshToken = event?.headers?.authorization?.split(' ')?.[1];
@@ -50,6 +53,7 @@ export const get = dbWrapper<{}, string>(async ({ db, event }) => {
  * Notably, this requires an access token, so that must be created first
  */
 export const post = dbWrapper<{}, string>(
+  client,
   async ({ db, authenticatedUserId }) => {
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthenticated;
@@ -84,6 +88,7 @@ export const post = dbWrapper<{}, string>(
  * Deletes a refresh token
  */
 export const remove = dbWrapper<{ token: string }, string>(
+  client,
   async ({ db, params: { token } }) => {
     const tokens = db.collection<Token>('tokens');
 
@@ -107,6 +112,7 @@ export const remove = dbWrapper<{ token: string }, string>(
  * Removes all tokens associated with a user
  */
 export const removeAll = dbWrapper<{ token: string }, string>(
+  client,
   async ({ db, authenticatedUserId: userId }) => {
     if (!userId) {
       return SERVER_ERROR.Unauthenticated;

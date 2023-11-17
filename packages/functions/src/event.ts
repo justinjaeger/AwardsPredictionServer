@@ -1,9 +1,12 @@
-import { type Filter } from 'mongodb';
+import { MongoClient, type Filter } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { EventStatus, type EventModel, type AwardsBody } from './types/models';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 
-// TODO: untested
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
 export const list = dbWrapper<undefined, EventModel[]>(
+  client,
   async ({ db, params }) => {
     const {
       maxYear: maxYearAsString,

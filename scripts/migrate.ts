@@ -19,6 +19,13 @@ import { amplifyCategoryNameToMongoCategoryName, amplifyCategoryTypeToMongoCateg
 import _ from 'lodash';
 
 /**
+ * IMPORTANT: MUST USE NODE 18 TO RUN THIS SCRIPT
+ * NODE VERSION MANAGER (NVM)
+- https://github.com/nvm-sh/nvm
+- source ~/.bashrc
+- then, nvm install 18
+- then, nvm use 18
+ * 
  * Documentation, all dynamodb commands:
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/
  * 

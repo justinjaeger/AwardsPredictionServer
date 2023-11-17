@@ -1,4 +1,5 @@
-import { type DeleteResult, type WithId } from 'mongodb';
+import { MongoClient, type DeleteResult, type WithId } from 'mongodb';
+import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import Tmdb from 'src/helper/tmdb';
 import { dbWrapper } from 'src/helper/wrapper';
 import {
@@ -8,11 +9,13 @@ import {
   CategoryType
 } from 'src/types/models';
 
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
 /**
  * Updates all movie and person info, which is derived from tmdb
  * Just do it for movies this year and later
  */
-export const handler = dbWrapper(async ({ db, client }) => {
+export const handler = dbWrapper(client, async ({ db, client }) => {
   // filter so only current and upcoming event years are updated
   const minYear = new Date().getFullYear() + 1; // means once the calendar year changes, info stops updating, which should be fine since movies are all released
   const allData = await db

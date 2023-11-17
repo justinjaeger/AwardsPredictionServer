@@ -1,4 +1,10 @@
-import { type Filter, ObjectId, type FindOptions, type WithId } from 'mongodb';
+import {
+  type Filter,
+  ObjectId,
+  type FindOptions,
+  type WithId,
+  MongoClient
+} from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type iPrediction,
@@ -20,6 +26,9 @@ import {
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
 import { getPhaseUserIsPredicting } from './helper/getPhaseUserIsPredicting';
 import { stripId } from './helper/stripId';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Get the most recent predictionset if yyyymmdd is not provided
@@ -32,6 +41,7 @@ export const get = dbWrapper<
   { yyyymmdd: number; categoryName?: CategoryName },
   WithId<PredictionSet> | null
 >(
+  client,
   async ({
     db,
     params: { userId, eventId, yyyymmdd: yyyymmddString, categoryName }
@@ -95,6 +105,7 @@ export const post = dbWrapper<
   },
   {}
 >(
+  client,
   async ({
     db,
     client,

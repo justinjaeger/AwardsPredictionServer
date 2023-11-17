@@ -1,4 +1,4 @@
-import { ObjectId, type UpdateFilter, type WithId } from 'mongodb';
+import { MongoClient, ObjectId, type UpdateFilter, type WithId } from 'mongodb';
 import Tmdb from './helper/tmdb';
 import { dbWrapper } from './helper/wrapper';
 import {
@@ -11,6 +11,9 @@ import {
 import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
 import { getSongKey } from './helper/getSongKey';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Creates movie/person/song if not exists, then creates contender
@@ -28,6 +31,7 @@ export const post = dbWrapper<
   },
   WithId<Contender> | null
 >(
+  client,
   async ({
     db,
     payload: {

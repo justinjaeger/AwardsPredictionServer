@@ -1,5 +1,4 @@
 import { type MongoClient, type Db } from 'mongodb';
-import connect from './connect';
 import { type APIGatewayProxyEvent, type Context } from 'aws-lambda';
 import { type ApiResponse } from '../types/responses';
 import Jwt from './jwt';
@@ -12,6 +11,7 @@ import Jwt from './jwt';
  * If the request still fails, it won't be because of an expired token, so no infinite loop, unless frontend is not changing the access token
  */
 export function dbWrapper<Req = {}, Res = {}>(
+  client: MongoClient,
   // func is what you're wrapping, so in other words, the result of THIS function
   func: (props: {
     event: APIGatewayProxyEvent;
@@ -28,7 +28,7 @@ export function dbWrapper<Req = {}, Res = {}>(
     context.callbackWaitsForEmptyEventLoop = false; // false sends the response right away when the callback runs, instead of waiting for the Node.js event loop to be empty. If this is false, any outstanding events continue to run during the next invocation.
     const payload = event.body ? JSON.parse(event.body) : {};
     // connect to mongodb
-    const { db, client } = connect();
+    const db = client.db('db');
     // decode userId from jwt (header looks like "Authorization: Bearer <token>")
     const accessToken = event?.headers?.authorization?.split(' ')?.[1];
     let authenticatedUserId: string | undefined;

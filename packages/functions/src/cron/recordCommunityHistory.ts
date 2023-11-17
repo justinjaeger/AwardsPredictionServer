@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-import { ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
+import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import { COMMUNITY_USER_ID } from 'src/helper/constants';
 import { getContenderPoints } from 'src/helper/getContenderPoints';
 import { shouldLogPredictionsAsTomorrow } from 'src/helper/shouldLogPredictionsAsTomorrow';
@@ -14,13 +15,15 @@ import {
   type CategoryName
 } from 'src/types/models';
 
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
 /**
  * Records community predictions every hour
  * logs one predictionset per event with userId = 'community'
  * Creates a new log on each unique day
  */
 
-export const handler = dbWrapper(async ({ db }) => {
+export const handler = dbWrapper(client, async ({ db }) => {
   const thirtyDaysAgo = getDate(-30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
   const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));

@@ -1,7 +1,11 @@
 import { type User } from './types/models';
 import { dbWrapper } from './helper/wrapper';
+import { MongoClient } from 'mongodb';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 
-export const get = dbWrapper<string>(async ({ event, db }) => {
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
+export const get = dbWrapper<string>(client, async ({ event, db }) => {
   // console.log('Event:', event);
 
   //   return { hi: 'hello' };

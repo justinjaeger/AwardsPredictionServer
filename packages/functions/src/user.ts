@@ -1,4 +1,4 @@
-import { ObjectId, type WithId } from 'mongodb';
+import { MongoClient, ObjectId, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import {
   type RelationshipWithUser,
@@ -9,6 +9,7 @@ import {
 } from './types/models';
 import { paginateCursor, getAggregatePagination } from './helper/utils';
 import { SERVER_ERROR } from './types/responses';
+import { mongoClientUrl, mongoClientOptions } from './helper/connect';
 
 /**
  * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
@@ -20,6 +21,11 @@ import { SERVER_ERROR } from './types/responses';
  * https://www.mongodb.com/docs/manual/tutorial/measure-index-use/
  */
 
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
+// Specify which database we want to use
+// const db = client.db('db');
+
 export const get = dbWrapper<
   {
     email?: string;
@@ -27,44 +33,48 @@ export const get = dbWrapper<
     excludeNestedFields?: boolean;
   },
   Partial<User>
->(async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
-  const projection = excludeNestedFields
-    ? { eventsPredicting: 0, recentPredictionSets: 0 }
-    : {};
+>(
+  client,
+  async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
+    const projection = excludeNestedFields
+      ? { eventsPredicting: 0, recentPredictionSets: 0 }
+      : {};
 
-  const filter = userId
-    ? { _id: new ObjectId(userId) }
-    : email
-    ? { email }
-    : oauthId
-    ? { oauthId }
-    : {};
+    const filter = userId
+      ? { _id: new ObjectId(userId) }
+      : email
+      ? { email }
+      : oauthId
+      ? { oauthId }
+      : {};
 
-  if (Object.keys(filter).length === 0) {
-    return SERVER_ERROR.BadRequest;
-  }
+    if (Object.keys(filter).length === 0) {
+      return SERVER_ERROR.BadRequest;
+    }
 
-  const user = await db
-    .collection<User>('users')
-    .findOne(filter, { projection });
+    const user = await db
+      .collection<User>('users')
+      .findOne(filter, { projection });
 
-  if (!user) {
+    if (!user) {
+      return {
+        ...SERVER_ERROR.NotFound,
+        message: 'User not found'
+      };
+    }
     return {
-      ...SERVER_ERROR.NotFound,
-      message: 'User not found'
+      statusCode: 200,
+      data: user
     };
   }
-  return {
-    statusCode: 200,
-    data: user
-  };
-});
+);
 
 // TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
 export const search = dbWrapper<
   { query: string; limit?: number; pageNumber?: number },
   Array<Partial<User>>
 >(
+  client,
   async ({
     db,
     params: { query, limit: limitAsString, pageNumber: pageNumberAsString }
@@ -97,6 +107,7 @@ export const search = dbWrapper<
  * Otherwise, I'll just basic information on who user is following.
  */
 export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
+  client,
   async ({
     db,
     params: {
@@ -155,6 +166,7 @@ export const listFollowings = dbWrapper<undefined, Array<Partial<User>>>(
 );
 
 export const listFollowers = dbWrapper<undefined, Array<Partial<User>>>(
+  client,
   async ({
     db,
     params: { userId, limit: limitAsString, pageNumber: pageNumberAsString }
@@ -206,6 +218,7 @@ export const listFollowers = dbWrapper<undefined, Array<Partial<User>>>(
 
 // UNTESTED: should use an index
 export const listMostFollowed = dbWrapper<undefined, Array<Partial<User>>>(
+  client,
   async ({
     db,
     params: { limit: limitAsString, pageNumber: pageNumberAsString }
@@ -232,7 +245,7 @@ export const listMostFollowed = dbWrapper<undefined, Array<Partial<User>>>(
 export const post = dbWrapper<
   { email: string; name?: string; username?: string },
   WithId<User> // returns the user id
->(async ({ db, payload }) => {
+>(client, async ({ db, payload }) => {
   const res = await db.collection<User>('users').insertOne(payload);
   const userId = res.insertedId.toString();
   const user = await db
@@ -248,6 +261,7 @@ export const post = dbWrapper<
 });
 
 export const put = dbWrapper<Partial<User>, {}>(
+  client,
   async ({ db, authenticatedUserId, payload }) => {
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;
@@ -280,6 +294,7 @@ export const put = dbWrapper<Partial<User>, {}>(
 );
 
 export const remove = dbWrapper<Partial<User>, {}>(
+  client,
   async ({ db, authenticatedUserId, client }) => {
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;

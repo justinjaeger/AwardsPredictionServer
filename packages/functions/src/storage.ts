@@ -2,12 +2,12 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SERVER_ERROR } from './types/responses';
 import { ApiHandler, useHeader } from 'sst/node/api';
 import Jwt from './helper/jwt';
-import connect from './helper/connect';
 import { type User } from './types/models';
-import { ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 
 const BUCKET = 'awards-app-profile-images-prod';
-const client = new S3Client({
+const s3Client = new S3Client({
   region: 'us-east-1',
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
@@ -15,10 +15,11 @@ const client = new S3Client({
   }
 });
 
+const mongoClient = new MongoClient(mongoClientUrl, mongoClientOptions);
+const db = mongoClient.db('db');
+
 export const post = ApiHandler(async (event) => {
   try {
-    const { db } = connect();
-
     // 1) Get/parse jwt from header
     const authorization = useHeader('authorization');
     const token = authorization?.split(' ')?.[1];
@@ -52,7 +53,7 @@ export const post = ApiHandler(async (event) => {
       Body: buff,
       ContentType: 'image/jpeg'
     });
-    await client.send(command);
+    await s3Client.send(command);
 
     // 5) Update user in db
     await db.collection<User>('users').updateOne(

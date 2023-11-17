@@ -1,13 +1,17 @@
-import { ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { CategoryName, type CategoryUpdateLog } from './types/models';
 import { SERVER_ERROR } from './types/responses';
+import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
  * Used for getting a all dates that you updated your predictions in a given event or category
  * TODO: not tested
  */
 export const get = dbWrapper<{}, Record<number, boolean>>(
+  client,
   async ({ db, params: { userId, eventId, category } }) => {
     if (!userId || !eventId) {
       return SERVER_ERROR.BadRequest;
