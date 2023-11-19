@@ -25,7 +25,6 @@ const sendEmail = async (email: string, token: string): Promise<boolean> => {
                     Verify Account
                 </button>
             </a>
-            ${url}
         </div>
     `
   };
