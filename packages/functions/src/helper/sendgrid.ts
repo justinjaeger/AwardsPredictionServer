@@ -18,11 +18,11 @@ const sendEmail = async (email: string, token: string): Promise<boolean> => {
     html: `
         <div>
             <h3 style="color: #1F1F1F; margin-bottom: 5px;">
-                Click to verify your account
+                Click to sign in
             </h3>
             <a href="${url}">
                 <button style="background-color: #c48900; color: white; font-weight: 700; border: none; border-radius: 5px; padding: 10px 20px; cursor: pointer;">
-                    Verify Account
+                    Sign In
                 </button>
             </a>
         </div>
