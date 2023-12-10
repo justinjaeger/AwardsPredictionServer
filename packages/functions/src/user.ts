@@ -37,7 +37,11 @@ export const get = dbWrapper<
   client,
   async ({ db, params: { userId, email, oauthId, excludeNestedFields } }) => {
     const projection = excludeNestedFields
-      ? { eventsPredicting: 0, recentPredictionSets: 0 }
+      ? {
+          eventsPredicting: 0,
+          categoriesPredicting: 0,
+          recentPredictionSets: 0
+        }
       : {};
 
     const filter = userId
@@ -272,6 +276,7 @@ export const put = dbWrapper<Partial<User>, {}>(
       payload.followerCount ??
       payload.followingCount ??
       payload.eventsPredicting ??
+      payload.categoriesPredicting ??
       payload.role
     ) {
       return {
@@ -322,6 +327,7 @@ export const remove = dbWrapper<Partial<User>, {}>(
           followerCount: 0,
           followingCount: 0,
           eventsPredicting: {},
+          categoriesPredicting: {},
           recentPredictionSets: [],
           role: UserRole.USER,
           name: '',

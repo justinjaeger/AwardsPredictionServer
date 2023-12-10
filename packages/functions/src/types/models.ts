@@ -225,6 +225,14 @@ export type iRecentPrediction = {
   topPredictions: iPrediction[];
 };
 
+export type iCategoriesPredicting = {
+  [eventId: string]: {
+    [categoryName: string]: {
+      createdAt: Date;
+    };
+  };
+};
+
 export type User = {
   email: string;
   oauthId?: string;
@@ -236,6 +244,7 @@ export type User = {
   followingCount?: number;
   followerCount?: number;
   eventsPredicting?: Record<string, string[]>; // key is event, value is array of categories
+  categoriesPredicting?: iCategoriesPredicting; // ...and replace with this
   recentPredictionSets?: iRecentPrediction[];
   amplify_id?: string;
 };

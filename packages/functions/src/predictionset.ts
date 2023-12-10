@@ -179,12 +179,16 @@ export const post = dbWrapper<
       );
 
     // prepare to update the user's recentPredictionSets
-    const user = await db
-      .collection<User>('users')
-      .findOne(
-        { _id: new ObjectId(userId) },
-        { projection: { recentPredictionSets: 1, eventsPredicting: 1 } }
-      );
+    const user = await db.collection<User>('users').findOne(
+      { _id: new ObjectId(userId) },
+      {
+        projection: {
+          recentPredictionSets: 1,
+          eventsPredicting: 1,
+          categoriesPredicting: 1
+        }
+      }
+    );
     let userRecentPredictionSets = user?.recentPredictionSets ?? [];
     // get rid of other same predictions for this category
     userRecentPredictionSets = userRecentPredictionSets.filter((ps) => {
@@ -215,13 +219,19 @@ export const post = dbWrapper<
 
     // update the user's eventsPredicting
     const userEventsPredicting = user?.eventsPredicting ?? {};
-    // add categoryName to eventsPredicting
     userEventsPredicting[eventId] = [
       ...(userEventsPredicting[eventId] ?? []).filter(
         (c) => c !== categoryName
       ),
       categoryName
     ];
+
+    // update the user's categoriesPredicting
+    const userCategoriesPredicting = user?.categoriesPredicting ?? {};
+    userCategoriesPredicting[eventId] = userCategoriesPredicting[eventId] ?? {};
+    userCategoriesPredicting[eventId][categoryName] = {
+      createdAt: new Date()
+    };
 
     // atomically execute all requests
     // Important:: You must pass the session to all requests!!
@@ -285,7 +295,8 @@ export const post = dbWrapper<
           {
             $set: {
               recentPredictionSets: userRecentPredictionSets,
-              eventsPredicting: userEventsPredicting
+              eventsPredicting: userEventsPredicting,
+              categoriesPredicting: userCategoriesPredicting
             }
           },
           { session }
