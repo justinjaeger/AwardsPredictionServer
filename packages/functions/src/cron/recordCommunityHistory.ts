@@ -119,8 +119,11 @@ export const handler = dbWrapper(client, async ({ db }) => {
       for (const [contenderId, rankings] of Object.entries(
         numPredicting[categoryName]
       )) {
-        pointsPerContenderId[categoryName][contenderId] =
-          getContenderPoints(rankings);
+        const { slots } = categories[categoryName as CategoryName];
+        pointsPerContenderId[categoryName][contenderId] = getContenderPoints(
+          rankings,
+          slots
+        );
       }
     }
     console.log('3');
