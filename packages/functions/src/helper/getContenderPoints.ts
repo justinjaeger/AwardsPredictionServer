@@ -19,11 +19,11 @@ export const getContenderPoints = (
       // ex: if slotNumber is 11, pointsPerPredictionAtSlot is 2
       // ex: if slotNumber is 1, pointsPerPredictionAtSlot is 10
       const pointsPerPredictionAtSlot =
-        slotNumber < slotsInCategory - 5
+        slotNumber >= slotsInCategory + 5
           ? 0.5
-          : slotNumber < slotsInCategory
+          : slotNumber >= slotsInCategory
           ? 2
-          : slotNumber < 1
+          : slotNumber > 1
           ? 5
           : 10;
 
