@@ -15,7 +15,7 @@ export const shouldLogPredictionsAsTomorrow = (
 ): boolean => {
   const todayYyyymmdd = dateToYyyymmdd(new Date());
 
-  // nomDateTime is when we close predictions for the shortlist announcement
+  // shortlistDateTime is when we close predictions for the shortlist announcement
   if (shortlistDateTime) {
     const shortlistTimeHasPassed =
       shortlistDateTime && shortlistDateTime < new Date();

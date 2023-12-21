@@ -183,7 +183,8 @@ export const handler = dbWrapper(client, async ({ db }) => {
       .map((c) => c.shortlistDateTime)
       .find(
         (shortlistDateTime) =>
-          shortlistDateTime && yyyymmdd === dateToYyyymmdd(shortlistDateTime)
+          shortlistDateTime &&
+          todayYyyymmdd === dateToYyyymmdd(shortlistDateTime)
       );
 
     console.log('6');
