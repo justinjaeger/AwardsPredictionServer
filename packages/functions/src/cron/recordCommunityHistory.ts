@@ -43,7 +43,8 @@ export const handler = dbWrapper(client, async ({ db }) => {
   const allUserIds = allUsers.map((u) => u._id);
 
   // for each active event, take each user's most recent predictionset
-  for (const { _id: eventId, nomDateTime, categories } of activeEvents) {
+  for (const event of activeEvents) {
+    const { _id: eventId, categories } = event;
     const predictionSetRequests = allUserIds.map(
       async (userId) =>
         db
@@ -177,22 +178,8 @@ export const handler = dbWrapper(client, async ({ db }) => {
     }
 
     console.log('5');
-    // if any shortlist is happening today, we need to know so we can write to tomorrow's predictions
-    // see POST:predictionset for why
-    const maybeShortlistDateTimeHappeningToday = Object.values(categories)
-      .map((c) => c.shortlistDateTime)
-      .find(
-        (shortlistDateTime) =>
-          shortlistDateTime &&
-          todayYyyymmdd === dateToYyyymmdd(shortlistDateTime)
-      );
-
-    console.log('6');
     // get the day we should log this predictionset as
-    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
-      nomDateTime,
-      maybeShortlistDateTimeHappeningToday
-    )
+    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(event)
       ? tomorrowYyyymmdd
       : todayYyyymmdd;
 

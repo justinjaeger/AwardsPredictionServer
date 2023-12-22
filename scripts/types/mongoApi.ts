@@ -121,7 +121,7 @@ export type iCategory = {
   type: CategoryType;
   name: string;
   slots?: number; // 5 by default
-  shortlistDateTime?: Date;
+  isShortlisted?: boolean;
   isHidden?: boolean;
 };
 
@@ -133,6 +133,7 @@ export type EventModel = {
   liveAt?: Date;
   nomDateTime?: Date;
   winDateTime?: Date;
+  shortlistDateTime?: Date;
   amplify_id?: string;
 };
 

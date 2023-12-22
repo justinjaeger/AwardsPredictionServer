@@ -1,3 +1,4 @@
+import { type EventModel } from 'src/types/models';
 import { dateToYyyymmdd } from './utils';
 
 /**
@@ -8,30 +9,30 @@ import { dateToYyyymmdd } from './utils';
  * just before the shortlist/nominations close. This is a leaderboard, if you will.
  * To avoid the overwrite, we can shift the date of the predictionset to the next day.
  * When tomorrow comes around, it will continue to write to that day.
+ *
+ * To simplify:
+ * If ANY shortlist is happening today, and the time has passed, log it as tomorrow
+ * If nominations are happening today, and the time has passed, log it as tomorrow.
  */
-export const shouldLogPredictionsAsTomorrow = (
-  shortlistDateTime: Date | undefined,
-  nomDateTime: Date | undefined
-): boolean => {
+export const shouldLogPredictionsAsTomorrow = (event: EventModel): boolean => {
+  const { nomDateTime, shortlistDateTime } = event;
   const todayYyyymmdd = dateToYyyymmdd(new Date());
 
-  // shortlistDateTime is when we close predictions for the shortlist announcement
-  if (shortlistDateTime) {
-    const shortlistTimeHasPassed =
-      shortlistDateTime && shortlistDateTime < new Date();
-    const shortlistHappenedToday =
-      shortlistDateTime && todayYyyymmdd === dateToYyyymmdd(shortlistDateTime);
-
-    return !!(shortlistTimeHasPassed && shortlistHappenedToday);
-  }
+  const shortlistsAreHappeningToday =
+    shortlistDateTime && todayYyyymmdd === dateToYyyymmdd(shortlistDateTime);
+  const shortlistsHavePassed =
+    shortlistDateTime && shortlistDateTime < new Date();
+  const logAsTomrrowForShortlists = !!(
+    shortlistsAreHappeningToday && shortlistsHavePassed
+  );
 
   // nomDateTime is when we close predictions for the nomination announcement
-  if (nomDateTime) {
-    const nomDateTimeHasPassed = nomDateTime && nomDateTime < new Date();
-    const nomHappenedToday =
-      nomDateTime && todayYyyymmdd === dateToYyyymmdd(nomDateTime);
-    return !!(nomDateTimeHasPassed && nomHappenedToday);
-  }
+  const nominationsAreHappeningToday =
+    nomDateTime && todayYyyymmdd === dateToYyyymmdd(nomDateTime);
+  const nominationsHavePassed = nomDateTime && nomDateTime < new Date();
+  const logAsTomrrowForNominations = !!(
+    nominationsAreHappeningToday && nominationsHavePassed
+  );
 
-  return false;
+  return logAsTomrrowForShortlists || logAsTomrrowForNominations;
 };

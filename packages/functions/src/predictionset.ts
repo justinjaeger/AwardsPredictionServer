@@ -13,7 +13,7 @@ import {
   type User,
   type CategoryUpdateLog,
   type CategoryName,
-  Phase,
+  EventStatus,
   type iCategoryPrediction,
   type EventUpdateLog
 } from './types/models';
@@ -24,7 +24,6 @@ import {
   RECENT_PREDICTION_SETS_TO_SHOW
 } from './helper/constants';
 import { shouldLogPredictionsAsTomorrow } from './helper/shouldLogPredictionsAsTomorrow';
-import { getPhaseUserIsPredicting } from './helper/getPhaseUserIsPredicting';
 import { stripId } from './helper/stripId';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 
@@ -130,6 +129,7 @@ export const post = dbWrapper<
           liveAt: 1,
           nomDateTime: 1,
           winDateTime: 1,
+          shortlistDateTime: 1,
           [`categories.${categoryName}`]: 1
         }
       }
@@ -142,15 +142,12 @@ export const post = dbWrapper<
         message: `Category ${categoryName} not found on event`
       };
     }
-    const { awardsBody, year, nomDateTime } = event;
-    const { shortlistDateTime } = categoryData;
+    const { awardsBody, year, winDateTime, status } = event;
 
-    const phaseUserIsPredicting = getPhaseUserIsPredicting(
-      event,
-      shortlistDateTime
-    );
+    const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
+    const eventIsArchived = status === EventStatus.ARCHIVED;
 
-    if (phaseUserIsPredicting === Phase.CLOSED) {
+    if (winDateHasPassed || eventIsArchived) {
       return {
         ...SERVER_ERROR.BadRequest,
         message: `Event is closed for predictions.`
@@ -163,10 +160,7 @@ export const post = dbWrapper<
 
     // determine whether we need to write to today or tomorrow to preserve final predictions
     // predictions post-nom/shortlist on the day of transition will count towards the next day
-    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(
-      nomDateTime,
-      shortlistDateTime
-    )
+    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(event)
       ? tomorrowYyyymmdd
       : todayYyyymmdd;
 
