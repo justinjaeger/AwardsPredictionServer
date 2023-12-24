@@ -14,8 +14,9 @@ import {ApiData, Contender} from "./types/mongoApi.ts";
 */
 
 /**
- * You might have to run this a few times WITHOUT updating anything, just to make sure it matches the titles
- * Because punctuation in my db vs the academy's website is going to be different for some titles
+ * The way I added shortlisted films was to un-hide them on the dev frontend, then add them myself,
+ * then make isHidden false
+ * then run this script to mark each of them with the proper accolade
  */
 
 async function handler(){
