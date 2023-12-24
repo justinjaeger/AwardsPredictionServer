@@ -13,18 +13,21 @@ import {ApiData, Contender, PredictionSet} from "./types/mongoApi.ts";
  * NOTE: For some reason, ENUMS do not work here, so just use STRINGS
 */
 
+/**
+ * The way I did this before was,
+ * I downloaded the entire apidata so I could do a text search on it
+ * then I found duplicates so I knew how many duplicates there were, and what to swap
+ */
+
 const SONG_IDS_TO_SWAP = [
-    "569094-Am I Dreaming",
-    "569094-Am I dreaming",
-    "569094-Am I Dreaming ",
-    "569094-Am I dreaming ",
+    "346698-What Was I Made For",
 ]
 
-const CORRECT_ID = "569094-Am I Dreaming";
+const CORRECT_ID = "346698-What Was I Made For?";
 
 const CORRECT_ENTRY = {
-    "title": "Am I Dreaming",
-    "movieTmdbId": 569094,
+    "title": "What Was I Made For?",
+    "movieTmdbId": 346698,
     "type": "SONG"
 }
 
@@ -101,6 +104,7 @@ async function handler(){
                 }
             )
         console.log('updateRes',updateRes)
+        console.log('done!')
 
     } catch (e){
         console.error(e);

@@ -13,6 +13,11 @@ import {ApiData, Contender} from "./types/mongoApi.ts";
  * NOTE: For some reason, ENUMS do not work here, so just use STRINGS
 */
 
+/**
+ * You might have to run this a few times WITHOUT updating anything, just to make sure it matches the titles
+ * Because punctuation in my db vs the academy's website is going to be different for some titles
+ */
+
 const AMPAS_SHORTLISTED_TITLES = {
     // ["DOCUMENTARY"]:[
     //     "American Symphony",
@@ -77,30 +82,30 @@ const AMPAS_SHORTLISTED_TITLES = {
     //     "Spider-Man: Across the Spider-Verse",
     //     "The Zone of Interest",
     // ],
-    // ["SONG"]: [
-    //     "Barbie",
-    //     "The Creator",
-    //     "Ferrari",
-    //     "The Killer",
-    //     "Killers of the Flower Moon",
-    //     "Maestro",
-    //     "Mission: Impossible - Dead Reckoning Part One",
-    //     "Napoleon",
-    //     "Oppenheimer",
-    //     "The Zone of Interest",
-    // ],
-    ["VISUAL_EFFECTS"]:[
+    ["SOUND"]: [
+        "Barbie",
         "The Creator",
-        "Godzilla Minus One",
-        "Guardians of the Galaxy Vol. 3",
-        "Indiana Jones and the Dial of Destiny",
+        "Ferrari",
+        "The Killer",
+        "Killers of the Flower Moon",
+        "Maestro",
         "Mission: Impossible - Dead Reckoning Part One",
         "Napoleon",
-        "Poor Things",
-        "Rebel Moon - Part One: A Child of Fire",
-        "Society of the Snow",
-        "Spider-Man: Across the Spider-Verse",
-    ]
+        "Oppenheimer",
+        "The Zone of Interest",
+    ],
+    // ["VISUAL_EFFECTS"]:[
+    //     "The Creator",
+    //     "Godzilla Minus One",
+    //     "Guardians of the Galaxy Vol. 3",
+    //     "Indiana Jones and the Dial of Destiny",
+    //     "Mission: Impossible - Dead Reckoning Part One",
+    //     "Napoleon",
+    //     "Poor Things",
+    //     "Rebel Moon - Part One: A Child of Fire",
+    //     "Society of the Snow",
+    //     "Spider-Man: Across the Spider-Verse",
+    // ]
     // TODO: Song, because my titles just aren't gonna match
 }
 
@@ -121,10 +126,7 @@ async function handler(){
         for (const [categoryName, titles] of Object.entries(AMPAS_SHORTLISTED_TITLES)){
             // first, find the title by searching apidata
             for (const title of titles){
-                const a = Object.values(allApiData);
-                // console.log('a',a)
                 const apiData = Object.values(allApiData).find((ad) => {
-                    // console.log('title',ad)
                     if (ad) {
                         if (typeof ad === 'object') {
                             // @ts-ignore
@@ -133,13 +135,12 @@ async function handler(){
                             }
                         }
                     }
-                    // if (ad?.title && ad.title === title){
-                    //     return true
-                    // }
                     return false
                 });
                 if (!apiData) throw new Error(`Could not find apiData for ${title}`);
                 console.log('apiData',apiData)
+
+                // NOTE: The first time you run this, you might want to comment out the BELOW, just to make sure the "titles" work
                 // @ts-ignore
                 const movieTmdbId = apiData.tmdbId;
                 console.log('5',categoryName)
@@ -157,6 +158,7 @@ async function handler(){
                     accolade: "SHORTLIST",
                 }});
                 console.log('8')
+                console.log('done!')
             }
         }
     } catch (e){
