@@ -12,7 +12,10 @@ import {
   type PredictionSet,
   type iPrediction,
   EventStatus,
-  type CategoryName
+  type CategoryName,
+  type User,
+  type Contender,
+  Phase
 } from 'src/types/models';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -37,14 +40,55 @@ export const handler = dbWrapper(client, async ({ db }) => {
 
   console.log('getting users...');
   const allUsers = await db
-    .collection('users')
+    .collection<User>('users')
     .find({}, { projection: { _id: 1 } })
     .toArray();
   const allUserIds = allUsers.map((u) => u._id);
 
+  console.log('getting contenders...');
+  const allContenders = await db
+    .collection<Contender>('contenders')
+    .find({}, { projection: { _id: 1, isHidden: 1, accolade: 1 } })
+    .toArray();
+  const indexedContenderIds: {
+    [cId: string]: { isHidden?: boolean; accolade?: Phase };
+  } = {};
+  allContenders.forEach(({ _id, isHidden, accolade }) => {
+    indexedContenderIds[_id.toString()] = { isHidden, accolade };
+  });
+
   // for each active event, take each user's most recent predictionset
   for (const event of activeEvents) {
-    const { _id: eventId, categories } = event;
+    const {
+      _id: eventId,
+      categories,
+      nomDateTime,
+      winDateTime,
+      shortlistDateTime
+    } = event;
+    // we want to record community predictions after the event has happened,
+    // BUT give it an hour extra so that we make sure to get what the users did right before they were locked out
+    // so the users will be locked out one hour before the last recording
+    const todayOneHourFromNow = new Date();
+    todayOneHourFromNow.setHours(todayOneHourFromNow.getHours() + 1);
+    const shortlistHasHappened =
+      shortlistDateTime && shortlistDateTime < todayOneHourFromNow;
+    const nominationsHaveHappened =
+      nomDateTime && nomDateTime < todayOneHourFromNow;
+    const winnersHaveHappened =
+      winDateTime && winDateTime < todayOneHourFromNow;
+    if (winnersHaveHappened) {
+      console.log('winners have happened, not recording...');
+      continue;
+    }
+
+    const someContendersAreShortlisted =
+      shortlistHasHappened &&
+      allContenders.some((c) => c.accolade === Phase.SHORTLIST);
+    const someContendersAreNominated =
+      nominationsHaveHappened &&
+      allContenders.some((c) => c.accolade === Phase.NOMINATION);
+
     const predictionSetRequests = allUserIds.map(
       async (userId) =>
         db
@@ -78,7 +122,10 @@ export const handler = dbWrapper(client, async ({ db }) => {
       )) {
         const { createdAt, predictions } = categoryPrediction;
         // don't record a prediction that's over 30 days old
-        if (createdAt < thirtyDaysAgo) continue;
+        const isOverThirtyDaysOld = createdAt < thirtyDaysAgo;
+        if (isOverThirtyDaysOld) continue;
+        const isShortlistedCategory =
+          categories[categoryName as CategoryName].isShortlisted;
         for (const {
           movieTmdbId,
           personTmdbId,
@@ -87,6 +134,28 @@ export const handler = dbWrapper(client, async ({ db }) => {
           ranking
         } of predictions) {
           const contenderId = contenderObjectId.toString();
+          // if hidden, don't tally it
+          const contenderIsHidden = indexedContenderIds[contenderId].isHidden;
+          if (contenderIsHidden) {
+            continue;
+          }
+          // filter for shortlist, if that's happened, and if nominations have NOT happened
+          const shouldFilterByIsShortlisted =
+            someContendersAreShortlisted &&
+            isShortlistedCategory &&
+            !someContendersAreNominated;
+          const contenderHasBeenShortlisted =
+            indexedContenderIds[contenderId].accolade === Phase.SHORTLIST;
+          if (shouldFilterByIsShortlisted && !contenderHasBeenShortlisted) {
+            continue;
+          }
+          // filter for nominations, if that's happened
+          const contenderHasBeenNominated =
+            indexedContenderIds[contenderId].accolade !== Phase.NOMINATION;
+          if (someContendersAreNominated && contenderHasBeenNominated) {
+            continue;
+          }
+          // tally all predictions that aren't blocked by the above filters
           if (!numPredicting[categoryName]) {
             numPredicting[categoryName] = {};
           }
