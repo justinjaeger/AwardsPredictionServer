@@ -15,7 +15,8 @@ import {
   type CategoryName,
   type User,
   type Contender,
-  Phase
+  Phase,
+  CategoryType
 } from 'src/types/models';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -222,6 +223,30 @@ export const handler = dbWrapper(client, async ({ db }) => {
       )) {
         // get the actual list ranking
         const ranking = sortedContenderIds.indexOf(contenderId) + 1;
+        // WORKAROUND FOR PUSHING DUPLICATE MOVIES: Keep whichever one has the highest ranking
+        // (the source of this is probably a bug where contenders from one category get wrongly saved to another)
+        const categoryIsFilm =
+          categories[categoryName as CategoryName].type === CategoryType.FILM;
+        const filmThatIsAlreadyInPredictions = predictions.find(
+          (p) => p.movieTmdbId === contenderInfo[contenderId].movieTmdbId
+        );
+        if (categoryIsFilm && filmThatIsAlreadyInPredictions) {
+          // (remember, lower number is higher rank)
+          const filmThatIsInPredictionsIsRankedHigher =
+            filmThatIsAlreadyInPredictions &&
+            filmThatIsAlreadyInPredictions.ranking < ranking;
+          if (filmThatIsInPredictionsIsRankedHigher) {
+            // if it has a higher ranking, just don't push this one
+            continue;
+          } else {
+            // remove it from predictions and push this one
+            predictions.splice(
+              predictions.indexOf(filmThatIsAlreadyInPredictions),
+              1
+            );
+          }
+        }
+        // END WORKAROUND
         predictions.push({
           ...contenderInfo[contenderId], // contains movieTmdbId, personTmdbId, songId
           contenderId: new ObjectId(contenderId),
