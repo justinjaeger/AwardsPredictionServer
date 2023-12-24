@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "migrate": "ts-node-esm migrate.ts",
+    "addToShortlist": "node --loader ts-node/esm addToShortlist.ts",
+    "fixSongs": "node --loader ts-node/esm fixSongs.ts",
     "typecheck": "tsc -noEmit",
     "lint": "eslint src/**/*.ts",
     "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write"
@@ -25,6 +26,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.379.1",
     "lodash": "^4.17.21",
-    "mongodb": "^5.7.0"
+    "mongodb": "^5.7.0",
+    "ts-node": "^10.9.2"
   }
 }

@@ -113,7 +113,6 @@ export type Contender = {
   songId?: string;
   isHidden?: boolean;
   accolade?: Phase;
-  numPredicting?: Record<number, number>; // for community predictions only
   amplify_id?: string;
 };
 
