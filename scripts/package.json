@@ -5,6 +5,7 @@
   "scripts": {
     "addToShortlist": "node --loader ts-node/esm addToShortlist.ts",
     "fixSongs": "node --loader ts-node/esm fixSongs.ts",
+    "shortlistAllShorts": "node --loader ts-node/esm shortlistAllShorts.ts",
     "typecheck": "tsc -noEmit",
     "lint": "eslint src/**/*.ts",
     "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write"
