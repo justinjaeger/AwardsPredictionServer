@@ -66,6 +66,8 @@ export function ApiStack({ stack }: StackContext) {
       "DELETE /tokens/{token}": `${PATH}/token.remove`,
       "DELETE /tokens/user": `${PATH}/token.removeAll`,
       "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
+      // DEVELOPER SCRIPTS
+      "GET /dev/leaderboards": `${PATH}/dev/leaderboards.handler`,
     },
   });
 

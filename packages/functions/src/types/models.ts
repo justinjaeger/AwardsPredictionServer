@@ -121,6 +121,8 @@ export type iCategory = {
   type: CategoryType;
   name: string;
   slots?: number; // 5 by default
+  shortlistSlots?: number;
+  winSlots?: number; // 1 by default, just in case there's a tie
   isShortlisted?: boolean;
   isHidden?: boolean;
 };
@@ -131,9 +133,9 @@ export type EventModel = {
   year: number;
   status: EventStatus;
   liveAt?: Date;
+  shortlistDateTime?: Date;
   nomDateTime?: Date;
   winDateTime?: Date;
-  shortlistDateTime?: Date;
   amplify_id?: string;
 };
 
@@ -234,6 +236,15 @@ export type iCategoriesPredicting = {
   };
 };
 
+export type iLeaderboardRanking = {
+  eventId: ObjectId;
+  phase: Phase;
+  rank: number;
+  percentageAccuracy: number;
+  riskiness: number;
+  predictionSetId: ObjectId;
+};
+
 export type User = {
   email: string;
   oauthId?: string;
@@ -247,6 +258,7 @@ export type User = {
   eventsPredicting?: Record<string, string[]>; // key is event, value is array of categories
   categoriesPredicting?: iCategoriesPredicting; // ...and replace with this
   recentPredictionSets?: iRecentPrediction[];
+  leaderboardRankings?: iLeaderboardRanking[];
   amplify_id?: string;
 };
 
