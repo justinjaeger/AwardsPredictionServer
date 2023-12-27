@@ -1,14 +1,9 @@
-/**
-   Leaderboard create index func:
-   await db.collection<User>('users').createIndex({
-     "leaderboardRankings.eventId": 1,
-     "leaderboardRankings.phase": 1,
-     "leaderboardRankings.rank": 1 
-   }, { unique: true, partialFilterExpression: { leaderboardRankings: { $exists: true } } })
- */
-
 import { MongoClient, type WithId, type ObjectId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
+import { formatPercentage } from 'src/helper/formatPercentage';
+import { getAccuratePredictionsTally } from 'src/helper/getAccuratePredictionsTally';
+import { getLeaderboardRiskiness } from 'src/helper/getLeaderboardRiskiness';
+import { getSlotsInPhase } from 'src/helper/getSlotsInPhase';
 import { dateToYyyymmdd } from 'src/helper/utils';
 import {
   AwardsBody,
@@ -17,7 +12,6 @@ import {
   type User,
   type Contender,
   type PredictionSet,
-  type iCategory,
   type CategoryName
 } from 'src/types/models';
 
@@ -26,6 +20,15 @@ const TARGET_EVENT_YEAR: number = 2024;
 const PHASE: Phase = Phase.SHORTLIST;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
+
+/**
+   Leaderboard create index func:
+   await db.collection<User>('users').createIndex({
+     "leaderboardRankings.eventId": 1,
+     "leaderboardRankings.phase": 1,
+     "leaderboardRankings.rank": 1 
+   }, { unique: true, partialFilterExpression: { leaderboardRankings: { $exists: true } } })
+ */
 
 export const handler = async () => {
   const db = client.db('db');
@@ -56,9 +59,9 @@ export const handler = async () => {
   // We're going to find each user's most recent prediction set for this phase
   // To find that, we're going to find the exact time that predictions closed on the event...
   const timeOfClose =
-    PHASE === 'SHORTLIST'
+    PHASE === Phase.SHORTLIST
       ? event.shortlistDateTime
-      : PHASE === 'NOMINATION'
+      : PHASE === Phase.NOMINATION
       ? event.nomDateTime
       : event.winDateTime;
   if (!timeOfClose) {
@@ -69,19 +72,19 @@ export const handler = async () => {
   // Then we need to find the proper yyyymmdd to query for
   // Now all we need to do for this is to get yyyymmdd from the timeOfClose
   const yyyymmdd = dateToYyyymmdd(timeOfClose);
-  console.log('yyyymmdd', yyyymmdd);
 
-  // Now we need to find the most recent prediction set for each user
+  // Now we need to find the most recent for each user and community
   // We're going to use the yyyymmdd to find the most recent prediction set for each user
 
-  // TODO: This isn't going to encompass the community "user"
-  // But it would be nice to have the community predictions in here too
-  const leaderboardRankings: {
-    [userId: string]: {
-      percentageAccuracy: number;
-      predictionSetId: ObjectId;
-    };
-  } = {};
+  console.log('getting community prediction...');
+  const communityPredictionSet = await db
+    .collection<PredictionSet>('predictionsets')
+    .findOne({ userId: 'community', eventId, yyyymmdd: { $lte: yyyymmdd } });
+  if (!communityPredictionSet) {
+    console.log('no community prediction set found; needed for riskiness');
+    return;
+  }
+
   console.log('getting prediction sets...');
   const pSetReqs: Array<Promise<WithId<PredictionSet> | null>> = [];
   for (const user of allUsers) {
@@ -91,77 +94,133 @@ export const handler = async () => {
         .findOne({ userId: user._id, eventId, yyyymmdd: { $lte: yyyymmdd } })
     );
   }
-  console.log('pSetReqs', pSetReqs.length);
   const predictionSets = await Promise.all(pSetReqs);
-  console.log('predictionSets', predictionSets.length); // 3991
-  // does it make sense that this is 3991?? Well we do have about 4k users. Just a lot, or the majority, aren't active
+  console.log('predictionSets', predictionSets.length);
+
+  // filters out non-shortlisted categories if we're compiling shortlist leaderboard
+  // and it disregards categories that weren't live until accolades were given (aka previously unpredictable)
+  const filteredCategories = Object.entries(event.categories).filter(
+    ([_, { isShortlisted, isHiddenBeforeNoms, isHiddenBeforeShortlist }]) => {
+      if (PHASE === Phase.SHORTLIST) {
+        if (isHiddenBeforeShortlist) {
+          return false;
+        }
+        return isShortlisted;
+      }
+      if (PHASE === Phase.NOMINATION) {
+        if (isHiddenBeforeNoms) {
+          return false;
+        }
+        return true;
+      }
+      return true;
+    }
+  );
+
+  const filteredCategoryNames = filteredCategories.map(
+    ([c]) => c as CategoryName
+  );
+
+  let potentialCorrectPredictions = 0;
+  for (const [, categoryData] of filteredCategories) {
+    const slots = getSlotsInPhase(PHASE, categoryData) as number; // ts is being dumb
+    potentialCorrectPredictions += slots;
+  }
+
+  // TODO: put the community predictions in here too
+  const leaderboardRankings: {
+    [userId: string]: {
+      percentageAccuracy: number;
+      riskiness: number;
+      predictionSetId: ObjectId;
+    };
+  } = {};
+
   for (const predictionSet of predictionSets) {
     if (!predictionSet) {
       continue;
     }
-    // now, determine the user's accuracy for each category
-    let potentialCorrectPredictions = 0;
-    let totalCorrectPredictions = 0;
-    // TODO: calculate riskiness by measuring your predictions up to the community predictions
 
-    // loop through each category, counting one per correct prediction
-    for (const [categoryName, { predictions }] of Object.entries(
-      predictionSet.categories
-    )) {
-      // get the slots for this category
-      const categoryData = event.categories[categoryName as CategoryName];
-      const {
-        slots: nomSlots,
-        shortlistSlots,
-        winSlots
-      } = categoryData as iCategory;
-      const slots: number =
-        PHASE === Phase.SHORTLIST
-          ? shortlistSlots ?? 15
-          : PHASE === Phase.NOMINATION
-          ? nomSlots ?? 5
-          : winSlots ?? 1;
-      // we should sort these predictions
-      const userPredictions = predictions
-        .sort((a, b) => {
-          return a.ranking - b.ranking;
-        })
-        .slice(0, slots);
-      const accoladedContenderIds = contenders
-        .filter((contender) => {
-          return contender.accolade === PHASE;
-        })
-        .map((c) => c._id);
-      const accurateUserPredictions = userPredictions.filter((prediction) => {
-        return accoladedContenderIds.includes(prediction.contenderId);
-      });
-      potentialCorrectPredictions += slots;
-      totalCorrectPredictions += accurateUserPredictions.length as number; // ts compiler is being dumb
-    }
+    const riskiness = getLeaderboardRiskiness(
+      PHASE,
+      event,
+      communityPredictionSet,
+      predictionSet,
+      (cId) => contenders.find((c) => c._id.toString() === cId),
+      filteredCategoryNames
+    );
+
+    const accuratePredictionsTally = getAccuratePredictionsTally(
+      PHASE,
+      event,
+      predictionSet,
+      (cId) => contenders.find((c) => c._id.toString() === cId),
+      filteredCategoryNames
+    );
+    const percentageAccuracy = formatPercentage(
+      accuratePredictionsTally / potentialCorrectPredictions
+    );
+
     // Now that we have the potential versus total correct predictions,
     // create a leaderboardRanking entry
     // TODO: push riskiness into here
     const userId = predictionSet.userId.toString();
     leaderboardRankings[userId] = {
-      percentageAccuracy: totalCorrectPredictions / potentialCorrectPredictions,
+      percentageAccuracy,
+      riskiness,
       predictionSetId: predictionSet._id
     };
   }
-  // TODO: once riskiness and accuracy are there, we can add another field to each entry, RANK
+
+  // add COMMUNITY predictions to leaderboardRankings (as though it's its own user)
+  const communityRiskiness = getLeaderboardRiskiness(
+    PHASE,
+    event,
+    communityPredictionSet,
+    communityPredictionSet,
+    (cId) => contenders.find((c) => c._id.toString() === cId),
+    filteredCategoryNames
+  );
+  const communityAccuratePredictionsTally = getAccuratePredictionsTally(
+    PHASE,
+    event,
+    communityPredictionSet,
+    (cId) => contenders.find((c) => c._id.toString() === cId),
+    filteredCategoryNames
+  );
+  const communityPercentageAccuracy = formatPercentage(
+    communityAccuratePredictionsTally / potentialCorrectPredictions
+  );
+  leaderboardRankings.community = {
+    percentageAccuracy: communityPercentageAccuracy,
+    riskiness: communityRiskiness,
+    predictionSetId: communityPredictionSet._id
+  };
+
+  // sort in order of rank (index 0 is #1)
   const sortedLeaderboardRankings = Object.entries(leaderboardRankings).sort(
     (
-      [userId1, { percentageAccuracy: pa1 }],
-      [userId2, { percentageAccuracy: pa2 }]
+      [userId1, { percentageAccuracy: pa1, riskiness: r1 }],
+      [userId2, { percentageAccuracy: pa2, riskiness: r2 }]
     ) => {
-      return pa1 - pa2;
+      // prioritize accuracy first
+      if (pa1 < pa2) {
+        return 1;
+      }
+      if (pa1 > pa2) {
+        return -1;
+      }
+      // but if equal, prefer the riskier predictions
+      if (r1 < r2) {
+        return 1;
+      }
+      if (r1 > r2) {
+        return -1;
+      }
+      return 0;
     }
   );
-  console.log('sortedLeaderboardRankings', sortedLeaderboardRankings.length);
-  console.log('sortedLeaderboardRankings[0]', sortedLeaderboardRankings[0]);
-  console.log(
-    'sortedLeaderboardRankings[sortedLeaderboardRankings.length - 1]',
-    sortedLeaderboardRankings[sortedLeaderboardRankings.length - 1]
-  );
+  console.log('sortedLeaderboardRankings', sortedLeaderboardRankings);
 
   // Now we need to update the leaderboardRankings for each user
   //   const requests = Promise.all(
