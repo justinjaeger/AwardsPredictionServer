@@ -69,6 +69,9 @@ export function ApiStack({ stack }: StackContext) {
       "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
       // DEVELOPER SCRIPTS
       "GET /dev/leaderboards": `${PATH}/dev/leaderboards.handler`,
+      "GET /dev/addToShortlist": `${PATH}/dev/addToShortlist.handler`,
+      "GET /dev/fixSongs": `${PATH}/dev/fixSongs.handler`,
+      "GET /dev/shortlistAllShorts": `${PATH}/dev/shortlistAllShorts.handler`,
     },
   });
 
