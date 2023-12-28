@@ -40,7 +40,8 @@ export const get = dbWrapper<
       ? {
           eventsPredicting: 0,
           categoriesPredicting: 0,
-          recentPredictionSets: 0
+          recentPredictionSets: 0,
+          leaderboardRankings: 0
         }
       : {};
 
@@ -274,6 +275,7 @@ export const put = dbWrapper<Partial<User>, {}>(
       payload.followingCount ??
       payload.eventsPredicting ??
       payload.categoriesPredicting ??
+      payload.leaderboardRankings ??
       payload.role
     ) {
       return {
@@ -324,6 +326,7 @@ export const remove = dbWrapper<Partial<User>, {}>(
           followerCount: 0,
           followingCount: 0,
           eventsPredicting: {},
+          leaderboardRankings: [],
           categoriesPredicting: {},
           recentPredictionSets: [],
           role: UserRole.USER,
