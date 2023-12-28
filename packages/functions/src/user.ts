@@ -74,10 +74,7 @@ export const get = dbWrapper<
 );
 
 // TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
-export const search = dbWrapper<
-  { query: string; limit?: number; pageNumber?: number },
-  Array<Partial<User>>
->(
+export const search = dbWrapper<undefined, Array<Partial<User>>>(
   client,
   async ({
     db,

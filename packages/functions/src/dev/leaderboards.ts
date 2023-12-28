@@ -1,4 +1,4 @@
-import { MongoClient, type WithId, type ObjectId } from 'mongodb';
+import { MongoClient, ObjectId, type WithId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import { formatPercentage } from 'src/helper/formatPercentage';
 import { getAccuratePredictionsTally } from 'src/helper/getAccuratePredictionsTally';
@@ -12,26 +12,42 @@ import {
   type User,
   type Contender,
   type PredictionSet,
-  type CategoryName
+  CategoryName
 } from 'src/types/models';
 
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 const TARGET_EVENT_YEAR: number = 2024;
 const PHASE: Phase = Phase.SHORTLIST;
+const INCLUDE_SHORT_FILMS: boolean = true;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
    Leaderboard create index func:
-   await db.collection<User>('users').createIndex({
-     "leaderboardRankings.eventId": 1,
-     "leaderboardRankings.phase": 1,
-     "leaderboardRankings.rank": 1 
-   }, { unique: true, partialFilterExpression: { leaderboardRankings: { $exists: true } } })
+   await db.collection<User>('users').createIndex(
+    {
+      'leaderboardRankings.eventId': 1,
+      'leaderboardRankings.phase': 1,
+      'leaderboardRankings.noShorts': 1,
+      'leaderboardRankings.rank': 1
+    },
+    {
+      unique: true,
+      partialFilterExpression: { leaderboardRankings: { $exists: true } }
+    }
+  );
  */
+
+const SHORT_CATEGORIES = [
+  CategoryName.SHORT_ANIMATED,
+  CategoryName.SHORT_LIVE_ACTION,
+  CategoryName.SHORT_DOCUMENTARY
+];
 
 export const handler = async () => {
   const db = client.db('db');
+
+  const shouldDiscountShortFilms = !INCLUDE_SHORT_FILMS;
 
   console.log('getting users...');
   const allUsers = await db
@@ -100,7 +116,16 @@ export const handler = async () => {
   // filters out non-shortlisted categories if we're compiling shortlist leaderboard
   // and it disregards categories that weren't live until accolades were given (aka previously unpredictable)
   const filteredCategories = Object.entries(event.categories).filter(
-    ([_, { isShortlisted, isHiddenBeforeNoms, isHiddenBeforeShortlist }]) => {
+    ([
+      categoryName,
+      { isShortlisted, isHiddenBeforeNoms, isHiddenBeforeShortlist }
+    ]) => {
+      const isShortCategory = SHORT_CATEGORIES.includes(
+        categoryName as CategoryName
+      );
+      if (isShortCategory && shouldDiscountShortFilms) {
+        return false;
+      }
       if (PHASE === Phase.SHORTLIST) {
         if (isHiddenBeforeShortlist) {
           return false;
@@ -111,7 +136,6 @@ export const handler = async () => {
         if (isHiddenBeforeNoms) {
           return false;
         }
-        return true;
       }
       return true;
     }
@@ -127,7 +151,6 @@ export const handler = async () => {
     potentialCorrectPredictions += slots;
   }
 
-  // TODO: put the community predictions in here too
   const leaderboardRankings: {
     [userId: string]: {
       percentageAccuracy: number;
@@ -163,7 +186,6 @@ export const handler = async () => {
 
     // Now that we have the potential versus total correct predictions,
     // create a leaderboardRanking entry
-    // TODO: push riskiness into here
     const userId = predictionSet.userId.toString();
     leaderboardRankings[userId] = {
       percentageAccuracy,
@@ -220,32 +242,76 @@ export const handler = async () => {
       return 0;
     }
   );
-  console.log('sortedLeaderboardRankings', sortedLeaderboardRankings);
 
   // Now we need to update the leaderboardRankings for each user
-  //   const requests = Promise.all(
-  //     Object.entries(leaderboardRankings).map(
-  //       async ([userId, { percentageAccuracy, predictionSetId }]) => {
-  //         return await db.collection<User>('users').updateOne(
-  //           { _id: new ObjectId(userId) },
-  //           {
-  //             $push: {
-  //               leaderboardRankings: {
-  //                 eventId,
-  //                 phase: PHASE,
-  //                 percentageAccuracy,
-  //                 predictionSetId,
-  //                 rank: 0, // TODO: we do not know their rank yet
-  //                 riskiness: 0 // TODO: we do not know their riskiness yet
-  //               }
-  //             }
-  //           }
-  //         );
-  //       }
-  //     )
-  //   );
-  //   console.log('waiting for create leaderboard / update user requests...');
-  //   await requests;
+  const requests = Promise.all(
+    sortedLeaderboardRankings.map(
+      async (
+        [userId, { percentageAccuracy, predictionSetId, riskiness }],
+        i
+      ) => {
+        const promise = async () => {
+          const existingLeaderboardEntry = await db
+            .collection<User>('users')
+            .findOne({
+              _id: new ObjectId(userId),
+              leaderboardRankings: {
+                $elemMatch: {
+                  eventId,
+                  phase: PHASE,
+                  noShorts: shouldDiscountShortFilms
+                }
+              }
+            });
+          if (existingLeaderboardEntry) {
+            // replace/update element
+            return await db.collection<User>('users').updateOne(
+              {
+                _id: new ObjectId(userId),
+                leaderboardRankings: {
+                  $elemMatch: {
+                    eventId,
+                    phase: PHASE,
+                    noShorts: shouldDiscountShortFilms
+                  }
+                }
+              },
+              {
+                $set: {
+                  'leaderboardRankings.$.percentageAccuracy':
+                    percentageAccuracy,
+                  'leaderboardRankings.$.predictionSetId': predictionSetId,
+                  'leaderboardRankings.$.rank': i + 1,
+                  'leaderboardRankings.$.riskiness': riskiness
+                }
+              }
+            );
+          } else {
+            // add new element
+            return await db.collection<User>('users').updateOne(
+              { _id: new ObjectId(userId) },
+              {
+                $push: {
+                  leaderboardRankings: {
+                    eventId,
+                    phase: PHASE,
+                    noShorts: shouldDiscountShortFilms,
+                    percentageAccuracy,
+                    predictionSetId,
+                    rank: i + 1,
+                    riskiness
+                  }
+                }
+              }
+            );
+          }
+        };
+        return promise;
+      }
+    )
+  );
+  console.log('updating user.leaderboardRankings...');
+  await requests;
 
   console.log('done!');
 };

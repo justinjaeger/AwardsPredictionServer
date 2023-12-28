@@ -241,6 +241,7 @@ export type iCategoriesPredicting = {
 export type iLeaderboardRanking = {
   eventId: ObjectId;
   phase: Phase;
+  noShorts: boolean;
   rank: number;
   percentageAccuracy: number;
   riskiness: number;
