@@ -313,5 +313,22 @@ export const handler = async () => {
   console.log('updating user.leaderboardRankings...');
   await requests;
 
+  // finally, update the event to indicate that the leaderboard has been created
+
+  const eventContainsLeaderboardAsArray =
+    event.leaderboards && typeof event.leaderboards === 'object';
+
+  if (eventContainsLeaderboardAsArray) {
+    console.log('updating event.leaderboards...');
+    await db.collection<EventModel>('events').updateOne(
+      { _id: eventId },
+      {
+        $addToSet: {
+          leaderboards: PHASE
+        }
+      }
+    );
+  }
+
   console.log('done!');
 };

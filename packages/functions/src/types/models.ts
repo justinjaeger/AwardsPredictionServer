@@ -138,6 +138,7 @@ export type EventModel = {
   shortlistDateTime?: Date;
   nomDateTime?: Date;
   winDateTime?: Date;
+  leaderboards?: Phase[];
   amplify_id?: string;
 };
 
