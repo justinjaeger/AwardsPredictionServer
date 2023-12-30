@@ -2,6 +2,7 @@ import { MongoClient, ObjectId, type WithId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import { formatPercentage } from 'src/helper/formatPercentage';
 import { getAccuratePredictionsTally } from 'src/helper/getAccuratePredictionsTally';
+import { getEventLeaderboardsKey } from 'src/helper/getEventLeaderboardsKey';
 import { getLeaderboardRiskiness } from 'src/helper/getLeaderboardRiskiness';
 import { getSlotsInPhase } from 'src/helper/getSlotsInPhase';
 import { dateToYyyymmdd } from 'src/helper/utils';
@@ -315,20 +316,17 @@ export const handler = async () => {
 
   // finally, update the event to indicate that the leaderboard has been created
 
-  const eventContainsLeaderboardAsArray =
-    event.leaderboards && typeof event.leaderboards === 'object';
+  const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
 
-  if (eventContainsLeaderboardAsArray) {
-    console.log('updating event.leaderboards...');
-    await db.collection<EventModel>('events').updateOne(
-      { _id: eventId },
-      {
-        $addToSet: {
-          leaderboards: PHASE
-        }
+  console.log('updating event...');
+  await db.collection<EventModel>('events').updateOne(
+    { _id: eventId },
+    {
+      $set: {
+        [setKey]: {}
       }
-    );
-  }
+    }
+  );
 
   console.log('done!');
 };
