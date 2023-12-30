@@ -51,7 +51,8 @@ export function ApiStack({ stack }: StackContext) {
       "GET /email/send": `${PATH}/email.send`,
       "GET /email/verify": `${PATH}/email.verify`,
       "GET /apidata": `${PATH}/apidata.get`,
-      "GET /leaderboard": `${PATH}/leaderboard.get`,
+      "GET /leaderboard/{eventId}/{phase}{pageNum}": `${PATH}/leaderboard.get`,
+      "GET /leaderboard/following/{userId}/{eventId}/{phase}{pageNum}": `${PATH}/leaderboard.leaderboardFromFollowing`,
       "GET /appinfo": `${PATH}/appinfo.get`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id

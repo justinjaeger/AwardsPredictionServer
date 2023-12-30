@@ -87,15 +87,15 @@ const FOLLOWING_LEADERBOARD_RESULTS_COUNT = 10;
  * I can include includeRecentPredictionSets.
  * Otherwise, I'll just basic information on who user is following.
  */
-export const listLeaderboardsFromFollowings = dbWrapper<
+export const leaderboardFromFollowing = dbWrapper<
   undefined,
   Array<Partial<User>>
 >(
   client,
   async ({
     db,
-    authenticatedUserId,
     params: {
+      userId,
       eventId,
       phase,
       noShorts: noShortsAsString,
@@ -107,12 +107,8 @@ export const listLeaderboardsFromFollowings = dbWrapper<
       ? parseInt(pageNumberAsString)
       : undefined;
 
-    if (!eventId || !phase || !pageNum) {
+    if (!userId || !eventId || !phase || !pageNum) {
       return SERVER_ERROR.BadRequest;
-    }
-
-    if (!authenticatedUserId) {
-      return SERVER_ERROR.Unauthenticated;
     }
 
     const lookup: any = {
@@ -143,7 +139,7 @@ export const listLeaderboardsFromFollowings = dbWrapper<
       .aggregate<RelationshipWithUser>([
         {
           $match: {
-            followingUserId: new ObjectId(authenticatedUserId)
+            followingUserId: new ObjectId(userId)
           }
         },
         {
