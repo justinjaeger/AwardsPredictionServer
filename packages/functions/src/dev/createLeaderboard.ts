@@ -25,6 +25,7 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 /**
    Leaderboard create index func:
+   // SORT ON RISK:
    await db.collection<User>('users').createIndex(
     {
       'leaderboardRankings.eventId': 1,
@@ -34,6 +35,18 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
     },
     {
       unique: true,
+      partialFilterExpression: { leaderboardRankings: { $exists: true } }
+    }
+  );
+  // SORT ON RISKINESS
+  await db.collection<User>('users').createIndex(
+    {
+      'leaderboardRankings.eventId': 1,
+      'leaderboardRankings.phase': 1,
+      'leaderboardRankings.noShorts': 1,
+      'leaderboardRankings.riskiness': 1
+    },
+    {
       partialFilterExpression: { leaderboardRankings: { $exists: true } }
     }
   );
