@@ -13,12 +13,10 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 const LEADERBOARD_PAGE_SIZE = 25;
 
-/**
- * This is going to be a GET LEADERBOARD function
- * It will take in an event ID and a phase, and noShorts
- * It's a paginated query, so it will take in a page number
- */
-export const get = dbWrapper<undefined, Array<Partial<User>>>(
+export const get = dbWrapper<
+  undefined,
+  { users: Array<Partial<User>>; hasNextPage: boolean }
+>(
   client,
   async ({
     db,
@@ -27,11 +25,10 @@ export const get = dbWrapper<undefined, Array<Partial<User>>>(
       phase,
       pageNum: pageNumAsString,
       noShorts: noShortsAsString,
-      sortByField = 'rank', // can be rank, riskiness
+      sortByField = 'rank', // can be rank, riskiness (as long as they are indexed!!)
       sortOrder = 'asc' // can be asc, desc
     }
   }) => {
-    // get the event ID, phase, and noShorts from the query params
     const noShorts = noShortsAsString === 'true';
     const pageNum = pageNumAsString ? parseInt(pageNumAsString) : undefined;
 
@@ -39,8 +36,6 @@ export const get = dbWrapper<undefined, Array<Partial<User>>>(
       return SERVER_ERROR.BadRequest;
     }
 
-    // I could also just do rank > 25, rank <= 50, for page two for example
-    // but this should be just as good. The logic would be, skip the first 25, then take the next 25
     const searchCursor = db
       .collection<User>('users')
       .find(
@@ -69,27 +64,27 @@ export const get = dbWrapper<undefined, Array<Partial<User>>>(
           }
         }
       )
-      .sort({ [sortByField]: sortOrder === 'desc' ? -1 : 1 }); // should be supported by an index!!
+      .sort({
+        [`leaderboardRankings.${sortByField}`]: sortOrder === 'desc' ? -1 : 1
+      }); // TODO: should be supported by an index!! double check
     paginateCursor(searchCursor, pageNum, LEADERBOARD_PAGE_SIZE);
     const userList = await searchCursor.toArray();
 
     return {
       statusCode: 200,
-      data: userList
+      data: {
+        users: userList,
+        hasNextPage: userList.length === LEADERBOARD_PAGE_SIZE
+      }
     };
   }
 );
 
 const FOLLOWING_LEADERBOARD_RESULTS_COUNT = 10;
 
-/**
- * If I want the recent predictions from who user is following,
- * I can include includeRecentPredictionSets.
- * Otherwise, I'll just basic information on who user is following.
- */
 export const leaderboardFromFollowing = dbWrapper<
   undefined,
-  Array<Partial<User>>
+  { users: Array<Partial<User>>; hasNextPage: boolean }
 >(
   client,
   async ({
@@ -99,7 +94,9 @@ export const leaderboardFromFollowing = dbWrapper<
       eventId,
       phase,
       noShorts: noShortsAsString,
-      pageNumber: pageNumberAsString
+      pageNumber: pageNumberAsString,
+      sortByField = 'rank', // can be rank, riskiness (as long as they are indexed!!)
+      sortOrder = 'asc' // can be asc, desc
     }
   }) => {
     const noShorts = noShortsAsString === 'true';
@@ -130,6 +127,11 @@ export const leaderboardFromFollowing = dbWrapper<
               noShorts
             }
           }
+        },
+        // TODO: Not sure if this will work but, it's my best guess
+        ...getAggregatePagination(pageNum, FOLLOWING_LEADERBOARD_RESULTS_COUNT),
+        $sort: {
+          [`leaderboardRankings.${sortByField}`]: sortOrder === 'desc' ? -1 : 1
         }
       }
     ];
@@ -145,7 +147,6 @@ export const leaderboardFromFollowing = dbWrapper<
         {
           $project: { _id: 0, followedUserId: 1 }
         },
-        ...getAggregatePagination(pageNum, FOLLOWING_LEADERBOARD_RESULTS_COUNT),
         { $lookup: lookup }
       ])
       .map(({ followedUserList }) => followedUserList[0])
@@ -153,7 +154,11 @@ export const leaderboardFromFollowing = dbWrapper<
 
     return {
       statusCode: 200,
-      data: followedUsers
+      data: {
+        users: followedUsers,
+        hasNextPage:
+          followedUsers.length === FOLLOWING_LEADERBOARD_RESULTS_COUNT
+      }
     };
   }
 );

@@ -12,7 +12,7 @@ import { getContenderStats } from './getContenderStats';
 import { formatPercentage } from './formatPercentage';
 
 /**
- * TODO: We also want to know which categories we're calculating, so maybe pass in a list of category names
+ * Note that riskiness is only added to for when the risk pays off
  */
 export const getLeaderboardRiskiness = (
   eventPhase: Phase,
