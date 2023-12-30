@@ -33,12 +33,11 @@ export const get = dbWrapper<undefined, Array<Partial<User>>>(
   }) => {
     // get the event ID, phase, and noShorts from the query params
     const noShorts = noShortsAsString === 'true';
+    const pageNum = pageNumAsString ? parseInt(pageNumAsString) : undefined;
 
-    if (!eventId || !phase || !pageNumAsString) {
+    if (!eventId || !phase || !pageNum) {
       return SERVER_ERROR.BadRequest;
     }
-
-    const pageNum = parseInt(pageNumAsString);
 
     // I could also just do rank > 25, rank <= 50, for page two for example
     // but this should be just as good. The logic would be, skip the first 25, then take the next 25
@@ -103,14 +102,14 @@ export const listLeaderboardsFromFollowings = dbWrapper<
       pageNumber: pageNumberAsString
     }
   }) => {
-    if (!eventId || !phase || !pageNumberAsString) {
-      return SERVER_ERROR.BadRequest;
-    }
-
     const noShorts = noShortsAsString === 'true';
     const pageNum = pageNumberAsString
       ? parseInt(pageNumberAsString)
       : undefined;
+
+    if (!eventId || !phase || !pageNum) {
+      return SERVER_ERROR.BadRequest;
+    }
 
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthenticated;
