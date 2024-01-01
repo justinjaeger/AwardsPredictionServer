@@ -13,7 +13,8 @@ import {
   type User,
   type Contender,
   type PredictionSet,
-  CategoryName
+  CategoryName,
+  type iLeaderboard
 } from 'src/types/models';
 
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
@@ -257,6 +258,23 @@ export const handler = async () => {
     }
   );
 
+  const topPercentageAccuracy =
+    sortedLeaderboardRankings[0][1].percentageAccuracy;
+  const medianPercentageAccuracy =
+    sortedLeaderboardRankings[sortedLeaderboardRankings.length / 2][1]
+      .percentageAccuracy;
+  const numPredicted = sortedLeaderboardRankings.length;
+
+  const percentageAccuracyDistribution: {
+    [percentageAccuracy: number]: number;
+  } = {};
+  sortedLeaderboardRankings.forEach(([, ranking]) => {
+    if (!percentageAccuracyDistribution[ranking.percentageAccuracy]) {
+      percentageAccuracyDistribution[ranking.percentageAccuracy] = 0;
+    }
+    percentageAccuracyDistribution[ranking.percentageAccuracy] += 1;
+  });
+
   // Now we need to update the leaderboardRankings for each user
   const requests = Promise.all(
     sortedLeaderboardRankings.map(
@@ -332,11 +350,21 @@ export const handler = async () => {
   const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
 
   console.log('updating event...');
+  const eventLeaderboard: iLeaderboard = {
+    // TODO: What about users who made an account then didn't do shit and got like 10%?
+    phase: PHASE,
+    noShorts: !!shouldDiscountShortFilms,
+    numPredicted,
+    topPercentageAccuracy,
+    medianPercentageAccuracy,
+    percentageAccuracyDistribution
+  };
+
   await db.collection<EventModel>('events').updateOne(
     { _id: eventId },
     {
       $set: {
-        [setKey]: {}
+        [setKey]: eventLeaderboard
       }
     }
   );
