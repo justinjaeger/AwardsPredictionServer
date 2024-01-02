@@ -259,7 +259,7 @@ export type iLeaderboardRanking = {
   rank: number;
   percentageAccuracy: number;
   riskiness: number;
-  predictionSetId: ObjectId;
+  yyyymmdd: number; // date of close
 };
 
 export type User = {

@@ -14,7 +14,8 @@ import {
   type Contender,
   type PredictionSet,
   CategoryName,
-  type iLeaderboard
+  type iLeaderboard,
+  type iLeaderboardRanking
 } from 'src/types/models';
 
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
@@ -320,19 +321,20 @@ export const handler = async () => {
             );
           } else {
             // add new element
+            const leaderboardRankings: iLeaderboardRanking = {
+              eventId,
+              phase: PHASE,
+              noShorts: shouldDiscountShortFilms,
+              percentageAccuracy,
+              yyyymmdd,
+              rank: i + 1,
+              riskiness
+            };
             return await db.collection<User>('users').updateOne(
               { _id: new ObjectId(userId) },
               {
                 $push: {
-                  leaderboardRankings: {
-                    eventId,
-                    phase: PHASE,
-                    noShorts: shouldDiscountShortFilms,
-                    percentageAccuracy,
-                    predictionSetId,
-                    rank: i + 1,
-                    riskiness
-                  }
+                  leaderboardRankings
                 }
               }
             );
