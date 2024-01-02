@@ -1,53 +1,71 @@
 import { MongoClient } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import {
-  type ApiData,
   type Contender,
   CategoryName,
-  Phase
+  Phase,
+  type Accolade,
+  AwardsBody
 } from 'src/types/models';
 
 /**
- * The way I added shortlisted films was to un-hide them on the dev frontend, then add them myself,
- * then make isHidden false
- * then run this script to mark each of them with the proper accolade
+ * The way I added shortlisted films was to un-hide them on the dev frontend,
+ * then add them myself IN THE APP: ONLY the shortlisted films
+ * then make isHidden false on the shortlist category
+ * then run this script to mark each with a shortlisted accolade
  */
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
-export const handler = async () => {
-  console.log('0');
-  const mongodb = client.db('db');
-  console.log('00');
+const YEAR: number = 2024;
+const AWARDS_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 
-  // first, get all the apidata
+export const handler = async () => {
+  const mongodb = client.db('db');
+
   try {
-    console.log('3');
-    const allApiData = await mongodb
-      .collection<ApiData>('apidata')
-      .findOne({ eventYear: 2024 });
-    console.log('4');
-    if (!allApiData) throw new Error(`Could not find apidata for 2024`);
+    const event = await mongodb
+      .collection<Event>('events')
+      .findOne({ eventYear: YEAR, awardsBody: AWARDS_BODY });
+
+    if (!event)
+      throw new Error(
+        `Could not find apidata for ${YEAR}+${AWARDS_BODY as string}`
+      );
 
     // get all shortlisted contenders
-    const contender = await mongodb
+    const contenders = await mongodb
       .collection<Contender>('contenders')
-      .updateMany(
-        {
-          category: {
-            $in: [
-              CategoryName.SHORT_DOCUMENTARY,
-              CategoryName.SHORT_LIVE_ACTION,
-              CategoryName.SHORT_ANIMATED
-            ]
-          }
-        },
-        {
-          $set: {
-            accolade: Phase.SHORTLIST
-          }
+      .find({
+        category: {
+          $in: [
+            CategoryName.SHORT_DOCUMENTARY,
+            CategoryName.SHORT_LIVE_ACTION,
+            CategoryName.SHORT_ANIMATED
+          ]
         }
+      })
+      .toArray();
+
+    const contenderIdToPhase: { [contenderId: string]: Phase } = {};
+    for (const contender of contenders) {
+      contenderIdToPhase[contender._id.toString()] = Phase.SHORTLIST;
+    }
+
+    const res = await mongodb.collection<Accolade>('accolades').findOne({
+      eventId: event._id
+    });
+    const currentAccolades = res?.accolades ?? {};
+    const current = currentAccolades.accolades;
+    const newAccolades = Object.assign(current, contenderIdToPhase);
+
+    // update all shortlisted contenders
+    await mongodb
+      .collection<Accolade>('accolades')
+      .updateOne(
+        { eventId: event._id },
+        { $set: { accolades: newAccolades } },
+        { upsert: true }
       );
-    console.log('result:', contender);
     console.log('done!');
   } catch (e) {
     console.error(e);

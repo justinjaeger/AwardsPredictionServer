@@ -53,6 +53,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /apidata": `${PATH}/apidata.get`,
       "GET /leaderboard/{eventId}/{phase}/{pageNum}": `${PATH}/leaderboard.get`,
       "GET /leaderboard/following/{userId}/{eventId}/{phase}/{pageNum}": `${PATH}/leaderboard.leaderboardFromFollowing`,
+      "GET /accolades/{eventId}": `${PATH}/accolade.get`,
       "GET /appinfo": `${PATH}/appinfo.get`,
       // POST
       "POST /users": `${PATH}/user.post`, // creating a user doesn't require an id
@@ -70,7 +71,7 @@ export function ApiStack({ stack }: StackContext) {
       "DELETE /users": `${PATH}/user.remove`, // delete token in payload unless userId is passed, in which case delete all from that userID
       // DEVELOPER SCRIPTS
       "GET /dev/createLeaderboard": `${PATH}/dev/createLeaderboard.handler`,
-      "GET /dev/addToShortlist": `${PATH}/dev/addToShortlist.handler`,
+      "GET /dev/addToAccolades": `${PATH}/dev/addToAccolades.handler`,
       "GET /dev/fixSongs": `${PATH}/dev/fixSongs.handler`,
       "GET /dev/shortlistAllShorts": `${PATH}/dev/shortlistAllShorts.handler`,
     },

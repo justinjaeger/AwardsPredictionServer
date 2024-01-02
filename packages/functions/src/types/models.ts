@@ -112,7 +112,7 @@ export type Contender = {
   personTmdbId?: number;
   songId?: string;
   isHidden?: boolean;
-  accolade?: Phase;
+  accolade?: Phase; // LEGACY (now on new table Accolade)
   numPredicting?: Record<number, number>; // for community predictions only
   amplify_id?: string;
 };
@@ -147,6 +147,7 @@ export type EventModel = {
   awardsBody: AwardsBody;
   year: number;
   status: EventStatus;
+  accoladeId?: ObjectId;
   liveAt?: Date;
   shortlistDateTime?: Date;
   nomDateTime?: Date;
@@ -277,6 +278,13 @@ export type User = {
   recentPredictionSets?: iRecentPrediction[];
   leaderboardRankings?: iLeaderboardRanking[];
   amplify_id?: string;
+};
+
+export type Accolade = {
+  eventId: ObjectId;
+  accolades: {
+    [contenderId: string]: Phase;
+  };
 };
 
 export type ApiData = {

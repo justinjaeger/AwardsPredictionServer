@@ -85,7 +85,7 @@ export const handler = async () => {
   console.log('getting contenders...');
   const contenders = await db
     .collection<Contender>('contenders')
-    .find({ eventId }, { projection: { _id: 1, isHidden: 1, accolade: 1 } })
+    .find({ eventId }, { projection: { _id: 1 } })
     .toArray();
 
   // We're going to find each user's most recent prediction set for this phase
