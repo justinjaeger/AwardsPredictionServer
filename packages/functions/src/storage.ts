@@ -5,6 +5,7 @@ import Jwt from './helper/jwt';
 import { type User } from './types/models';
 import { MongoClient, ObjectId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+import { type APIGatewayProxyEventV2 } from 'aws-lambda';
 
 const BUCKET = 'awards-app-profile-images-prod';
 const s3Client = new S3Client({
@@ -18,7 +19,10 @@ const s3Client = new S3Client({
 const mongoClient = new MongoClient(mongoClientUrl, mongoClientOptions);
 const db = mongoClient.db('db');
 
-export const post = ApiHandler(async (event) => {
+const storeImage = async (
+  e: APIGatewayProxyEventV2,
+  size?: 'sm' | 'md' | 'lg'
+) => {
   try {
     // 1) Get/parse jwt from header
     const authorization = useHeader('authorization');
@@ -42,11 +46,12 @@ export const post = ApiHandler(async (event) => {
 
     // 3) Generate key from user email
     const random = Math.floor(100000 + Math.random() * 900000); // 6 digit random number
-    const key = user.email.split('@')[0] + random.toString();
+    const key =
+      user.email.split('@')[0] + random.toString() + (size ? '-' + size : '');
 
     // 4) Parse body and upload to s3
-    // @ts-expect-error - event.body is defined
-    const buff = Buffer.from(event.body, 'base64');
+    // @ts-expect-error - e.body is defined
+    const buff = Buffer.from(e.body, 'base64');
     const command = new PutObjectCommand({
       Bucket: BUCKET,
       Key: 'public/' + key,
@@ -55,12 +60,20 @@ export const post = ApiHandler(async (event) => {
     });
     await s3Client.send(command);
 
+    const imageKey: keyof User = !size
+      ? 'image'
+      : size === 'sm'
+      ? 'imageSm'
+      : size === 'md'
+      ? 'imageMd'
+      : 'imageLg';
+
     // 5) Update user in db
     await db.collection<User>('users').updateOne(
       {
         _id: new ObjectId(userId)
       },
-      { $set: { image: key } }
+      { $set: { [imageKey]: key } }
     );
 
     return { statusCode: 200, data: key };
@@ -68,4 +81,21 @@ export const post = ApiHandler(async (event) => {
     console.log('Error getting s3 file:', err);
     return { ...SERVER_ERROR.Error, message: err };
   }
+};
+
+// Must preserve original endpoint for bw compatibility
+export const post = ApiHandler(async (e) => {
+  return await storeImage(e);
+});
+
+export const postSm = ApiHandler(async (e) => {
+  return await storeImage(e, 'sm');
+});
+
+export const postMd = ApiHandler(async (e) => {
+  return await storeImage(e, 'md');
+});
+
+export const postLg = ApiHandler(async (e) => {
+  return await storeImage(e, 'lg');
 });
