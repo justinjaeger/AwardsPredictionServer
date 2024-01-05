@@ -2,8 +2,7 @@ import {
   type PredictionSet,
   type CategoryName,
   type Phase,
-  type EventModel,
-  type Contender
+  type EventModel
 } from 'src/types/models';
 import { getHasAccoladeOrAbove } from './getHasAccoladeOrAbove';
 import { getSlotsInPhase } from './getSlotsInPhase';
@@ -18,7 +17,7 @@ export const getAccuratePredictionsTally = (
   eventPhase: Phase,
   event: EventModel,
   userPredictionSet: WithId<PredictionSet>,
-  getContenderById: (contenderId: string) => WithId<Contender> | undefined,
+  getContenderAccolade: (contenderId: string) => Phase | undefined,
   categoriesToAccount?: CategoryName[] // if none, just count them all
 ): number => {
   const filteredPredictionSetCategories = Object.entries(
@@ -47,11 +46,8 @@ export const getAccuratePredictionsTally = (
 
     const predictedContenderIdsWithAccolade: string[] = [];
     predictedContenderIds.forEach((cId) => {
-      const contender = getContenderById(cId);
-      const hasAccoladeOrAbove = getHasAccoladeOrAbove(
-        eventPhase,
-        contender?.accolade
-      );
+      const accolade = getContenderAccolade(cId);
+      const hasAccoladeOrAbove = getHasAccoladeOrAbove(eventPhase, accolade);
       if (hasAccoladeOrAbove) {
         predictedContenderIdsWithAccolade.push(cId);
       }

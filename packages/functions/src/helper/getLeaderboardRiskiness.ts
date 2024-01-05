@@ -3,8 +3,7 @@ import {
   type Phase,
   type CategoryName,
   type PredictionSet,
-  type EventModel,
-  type Contender
+  type EventModel
 } from 'src/types/models';
 import { getSlotsInPhase } from './getSlotsInPhase';
 import { getHasAccoladeOrAbove } from './getHasAccoladeOrAbove';
@@ -19,7 +18,7 @@ export const getLeaderboardRiskiness = (
   event: EventModel,
   communityPredictionSet: WithId<PredictionSet>,
   userPredictionSet: WithId<PredictionSet>,
-  getContenderById: (contenderId: string) => WithId<Contender> | undefined,
+  getContenderAccolade: (contenderId: string) => Phase | undefined,
   categoriesToAccount?: CategoryName[] // if none, just count them all
 ): number => {
   // first, filter the user predictions to only include the categories we're accounting for
@@ -65,10 +64,10 @@ export const getLeaderboardRiskiness = (
 
         const cId = communityPrediction.contenderId.toString();
 
-        const contender = getContenderById(cId);
+        const accolade = getContenderAccolade(cId);
         const contenderHasAccolade = getHasAccoladeOrAbove(
           eventPhase,
-          contender?.accolade
+          accolade
         );
         const userPredictedTheContender =
           contenderIdsThatUserPredicted.includes(cId);

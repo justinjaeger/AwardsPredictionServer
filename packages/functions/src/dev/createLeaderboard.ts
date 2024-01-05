@@ -11,11 +11,11 @@ import {
   type EventModel,
   Phase,
   type User,
-  type Contender,
   type PredictionSet,
   CategoryName,
   type iLeaderboard,
-  type iLeaderboardRanking
+  type iLeaderboardRanking,
+  type Accolade
 } from 'src/types/models';
 
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
@@ -82,11 +82,14 @@ export const handler = async () => {
     return;
   }
 
-  console.log('getting contenders...');
-  const contenders = await db
-    .collection<Contender>('contenders')
-    .find({ eventId }, { projection: { _id: 1 } })
-    .toArray();
+  console.log('getting accolades...');
+  const accolade = await db
+    .collection<Accolade>('accolades')
+    .findOne({ eventId });
+  if (!accolade) {
+    console.log('no accolades found for this event');
+    return;
+  }
 
   // We're going to find each user's most recent prediction set for this phase
   // To find that, we're going to find the exact time that predictions closed on the event...
@@ -185,7 +188,7 @@ export const handler = async () => {
       event,
       communityPredictionSet,
       predictionSet,
-      (cId) => contenders.find((c) => c._id.toString() === cId),
+      (cId) => accolade.accolades[cId],
       filteredCategoryNames
     );
 
@@ -193,7 +196,7 @@ export const handler = async () => {
       PHASE,
       event,
       predictionSet,
-      (cId) => contenders.find((c) => c._id.toString() === cId),
+      (cId) => accolade.accolades[cId],
       filteredCategoryNames
     );
     const percentageAccuracy = formatPercentage(
@@ -216,14 +219,14 @@ export const handler = async () => {
     event,
     communityPredictionSet,
     communityPredictionSet,
-    (cId) => contenders.find((c) => c._id.toString() === cId),
+    (cId) => accolade.accolades[cId],
     filteredCategoryNames
   );
   const communityAccuratePredictionsTally = getAccuratePredictionsTally(
     PHASE,
     event,
     communityPredictionSet,
-    (cId) => contenders.find((c) => c._id.toString() === cId),
+    (cId) => accolade.accolades[cId],
     filteredCategoryNames
   );
   const communityPercentageAccuracy = formatPercentage(
