@@ -16,7 +16,8 @@ import {
   type User,
   type Contender,
   Phase,
-  CategoryType
+  CategoryType,
+  type Accolade
 } from 'src/types/models';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -54,8 +55,8 @@ export const handler = dbWrapper(client, async ({ db }) => {
   const indexedContenderIds: {
     [cId: string]: { isHidden?: boolean; accolade?: Phase };
   } = {};
-  allContenders.forEach(({ _id, isHidden, accolade }) => {
-    indexedContenderIds[_id.toString()] = { isHidden, accolade };
+  allContenders.forEach(({ _id, isHidden }) => {
+    indexedContenderIds[_id.toString()] = { isHidden };
   });
 
   // for each active event, take each user's most recent predictionset
@@ -67,6 +68,12 @@ export const handler = dbWrapper(client, async ({ db }) => {
       winDateTime,
       shortlistDateTime
     } = event;
+
+    const accolades = await db.collection<Accolade>('accolades').findOne({
+      eventId: new ObjectId(eventId)
+    });
+    const contenderIdToAccolade = accolades?.accolades ?? {};
+
     // we want to record community predictions after the event has happened,
     // BUT give it an hour extra so that we make sure to get what the users did right before they were locked out
     // so the users will be locked out one hour before the last recording
@@ -85,10 +92,14 @@ export const handler = dbWrapper(client, async ({ db }) => {
 
     const someContendersAreShortlisted =
       shortlistHasHappened &&
-      allContenders.some((c) => c.accolade === Phase.SHORTLIST);
+      allContenders.some(
+        (c) => contenderIdToAccolade[c._id.toString()] === Phase.SHORTLIST
+      );
     const someContendersAreNominated =
       nominationsHaveHappened &&
-      allContenders.some((c) => c.accolade === Phase.NOMINATION);
+      allContenders.some(
+        (c) => contenderIdToAccolade[c._id.toString()] === Phase.NOMINATION
+      );
 
     const predictionSetRequests = allUserIds.map(
       async (userId) =>
