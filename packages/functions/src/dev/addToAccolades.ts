@@ -123,11 +123,11 @@ export const handler = async () => {
     console.log('2.5');
     const event = await mongodb
       .collection<EventModel>('events')
-      .findOne({ eventYear: YEAR, awardsBody: AWARDS_BODY });
+      .findOne({ awardsBody: AWARDS_BODY, year: YEAR });
     console.log('4');
     if (!event)
       throw new Error(
-        `Could not find apidata for ${YEAR}+${AWARDS_BODY as string}`
+        `Could not find event for ${YEAR}+${AWARDS_BODY as string}`
       );
 
     // get all the apidata
@@ -181,8 +181,7 @@ export const handler = async () => {
       eventId: event._id
     });
     const currentAccolades = res?.accolades ?? {};
-    const current = currentAccolades.accolades;
-    const newAccolades = Object.assign(current, contenderIdToPhase);
+    const newAccolades = Object.assign(currentAccolades, contenderIdToPhase);
     await mongodb
       .collection<Accolade>('accolades')
       .updateOne(
