@@ -1,119 +1,30 @@
 import { MongoClient } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
+import * as ACCOLADE_DATA from 'src/helper/accoladeData';
 import {
   type ApiData,
-  CategoryName,
+  type CategoryName,
   type Contender,
-  Phase,
+  type Phase,
   type Movie,
-  AwardsBody,
   type EventModel,
-  type Accolade
+  type Accolade,
+  CategoryType,
+  type Person
 } from 'src/types/models';
+import { type iAccoladeData } from 'src/helper/accoladeData';
 
 /**
  * You might have to run this a few times WITHOUT updating anything, just to make sure it matches the titles
  * Because punctuation in my db vs the academy's website is going to be different for some titles
  */
 
-const PHASE: Phase = Phase.SHORTLIST;
-const AWARDS_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
-const YEAR: number = 2024;
-
-// TODO: THIS ONLY WORKS WITH NON-SONG AND NON-PERFORMANCE CATEGORIES
-const CATEGORY_TO_TITLE = {
-  [CategoryName.DOCUMENTARY]: [
-    'American Symphony',
-    'Apolonia, Apolonia',
-    'Beyond Utopia',
-    "Bobi Wine: The People's President",
-    'Desperate Souls, Dark City and the Legend of Midnight Cowboy',
-    'The Eternal Memory',
-    'Four Daughters',
-    'Going to Mars: The Nikki Giovanni Project',
-    'In the Rearview',
-    'Stamped from the Beginning',
-    'Still: A Michael J. Fox Movie',
-    'A Still Small Voice',
-    '32 Sounds',
-    'To Kill a Tiger',
-    '20 Days in Mariupol'
-  ],
-  [CategoryName.INTERNATIONAL]: [
-    'Amerikatsi',
-    'The Monk and the Gun',
-    'The Promised Land',
-    'Fallen Leaves',
-    'The Taste of Things',
-    'The Teachers’ Lounge',
-    'Godland',
-    'The Captain',
-    'Perfect Days',
-    'Tótem',
-    'The Mother of All Lies',
-    'Society of the Snow',
-    'Four Daughters',
-    '20 Days in Mariupol',
-    'The Zone of Interest'
-  ],
-  [CategoryName.MAKEUP]: [
-    'Beau Is Afraid',
-    'Ferrari',
-    'Golda',
-    'Killers of the Flower Moon',
-    'The Last Voyage of the Demeter',
-    'Maestro',
-    'Napoleon',
-    'Oppenheimer',
-    'Poor Things',
-    'Society of the Snow'
-  ],
-  [CategoryName.SCORE]: [
-    'American Fiction',
-    'American Symphony',
-    'Barbie',
-    'The Boy and the Heron',
-    'The Color Purple',
-    'Elemental',
-    'The Holdovers',
-    'Indiana Jones and the Dial of Destiny',
-    'Killers of the Flower Moon',
-    'Oppenheimer',
-    'Poor Things',
-    'Saltburn',
-    'Society of the Snow',
-    'Spider-Man: Across the Spider-Verse',
-    'The Zone of Interest'
-  ],
-  [CategoryName.SOUND]: [
-    'Barbie',
-    'The Creator',
-    'Ferrari',
-    'The Killer',
-    'Killers of the Flower Moon',
-    'Maestro',
-    'Mission: Impossible - Dead Reckoning Part One',
-    'Napoleon',
-    'Oppenheimer',
-    'The Zone of Interest'
-  ],
-  [CategoryName.VISUAL_EFFECTS]: [
-    'The Creator',
-    'Godzilla Minus One',
-    'Guardians of the Galaxy Vol. 3',
-    'Indiana Jones and the Dial of Destiny',
-    'Mission: Impossible - Dead Reckoning Part One',
-    'Napoleon',
-    'Poor Things',
-    'Rebel Moon - Part One: A Child of Fire',
-    'Society of the Snow',
-    'Spider-Man: Across the Spider-Verse'
-  ]
-};
+const DATA: iAccoladeData = ACCOLADE_DATA.AMPAS_2024_NOMS;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 export const handler = async () => {
+  const { awardsBody, year, phase, data } = DATA;
   console.log('1');
   const mongodb = client.db('db');
   console.log('2');
@@ -123,55 +34,112 @@ export const handler = async () => {
     console.log('2.5');
     const event = await mongodb
       .collection<EventModel>('events')
-      .findOne({ awardsBody: AWARDS_BODY, year: YEAR });
+      .findOne({ awardsBody, year });
     console.log('4');
     if (!event)
       throw new Error(
-        `Could not find event for ${YEAR}+${AWARDS_BODY as string}`
+        `Could not find event for ${year as number}+${awardsBody as string}`
       );
 
     // get all the apidata
     console.log('3');
     const allApiData = await mongodb
       .collection<ApiData>('apidata')
-      .findOne({ eventYear: YEAR });
+      .findOne({ eventYear: year });
     console.log('4');
-    if (!allApiData) throw new Error(`Could not find apidata for ${YEAR}`);
+    if (!allApiData)
+      throw new Error(`Could not find apidata for ${year as number}`);
+
+    const getMovieTmdbId = (title: string) => {
+      const movieApiData = Object.entries(allApiData).find(([key, ad]) => {
+        if (ad) {
+          if (typeof ad === 'object') {
+            if ((ad as Movie).title?.toLowerCase() === title.toLowerCase()) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }) as [string, Movie];
+      if (!movieApiData)
+        throw new Error(`Could not find movieApiData for ${title}`);
+      const movieTmdbId = parseInt(movieApiData[0]);
+      return movieTmdbId;
+    };
+
+    const getPersonTmdbId = (name: string) => {
+      const personApiData = Object.entries(allApiData).find(([key, ad]) => {
+        if (ad) {
+          if (typeof ad === 'object') {
+            if ((ad as Person).name?.toLowerCase() === name.toLowerCase()) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      if (!personApiData)
+        throw new Error(`Could not find personApiData for ${name}`);
+      const personTmdbId = parseInt(personApiData[0]);
+      return personTmdbId;
+    };
 
     // populate contenderIdToPhase object, while validating the CATEOGRY_TO_TITLE titles
     const contenderIdToPhase: { [contenderId: string]: Phase } = {};
-    for (const [categoryName, titles] of Object.entries(CATEGORY_TO_TITLE)) {
-      // find the title by searching apidata
-      for (const title of titles) {
-        const apiData = Object.values(allApiData).find((ad) => {
-          if (ad) {
-            if (typeof ad === 'object') {
-              if ((ad as Movie).title?.toLowerCase() === title.toLowerCase()) {
-                return true;
-              }
-            }
-          }
-          return false;
-        });
-        if (!apiData) throw new Error(`Could not find apiData for ${title}`);
-        console.log('apiData', apiData);
 
-        // NOTE: The first time you run this, you might want to comment out the BELOW, just to check that "titles" work
-        const movieTmdbId = (apiData as Movie).tmdbId;
-        console.log('5', categoryName);
-        console.log('movieTmdbId', movieTmdbId);
-        const contender = await mongodb
-          .collection<Contender>('contenders')
-          .findOne({
-            eventId: event._id,
-            movieTmdbId,
-            category: categoryName as CategoryName
-          });
-        console.log('6');
-        if (!contender)
-          throw new Error(`Could not find contender for ${title}`);
-        console.log('7');
-        contenderIdToPhase[contender._id.toString()] = PHASE;
+    for (const [categoryName, titles] of Object.entries(data)) {
+      const { type } = event.categories[categoryName as CategoryName];
+      if (type === CategoryType.SONG) {
+        for (const contenderSongId of titles) {
+          const contender = await mongodb
+            .collection<Contender>('contenders')
+            .findOne({
+              eventId: event._id,
+              category: categoryName as CategoryName,
+              songId: contenderSongId
+            });
+          if (!contender)
+            throw new Error(
+              `Could not find song contender for ${contenderSongId as string}`
+            );
+          contenderIdToPhase[contender._id.toString()] = phase;
+        }
+      } else if (type === CategoryType.PERFORMANCE) {
+        for (const actorNameAsteriskTitle of titles) {
+          const [actorName, title] = actorNameAsteriskTitle.split('*');
+          const movieTmdbId = getMovieTmdbId(title);
+          const personTmdbId = getPersonTmdbId(actorName);
+          const contender = await mongodb
+            .collection<Contender>('contenders')
+            .findOne({
+              eventId: event._id,
+              category: categoryName as CategoryName,
+              movieTmdbId,
+              personTmdbId
+            });
+          if (!contender)
+            throw new Error(
+              `Could not find performance contender for ${
+                actorNameAsteriskTitle as string
+              }`
+            );
+          contenderIdToPhase[contender._id.toString()] = phase;
+        }
+      } else {
+        for (const title of titles) {
+          // NOTE: The first time you run this, you might want to comment out the BELOW, just to check that "titles" work
+          const movieTmdbId = getMovieTmdbId(title);
+          const contender = await mongodb
+            .collection<Contender>('contenders')
+            .findOne({
+              eventId: event._id,
+              category: categoryName as CategoryName,
+              movieTmdbId
+            });
+          if (!contender)
+            throw new Error(`Could not find contender for ${title as string}`);
+          contenderIdToPhase[contender._id.toString()] = phase;
+        }
       }
     }
 
