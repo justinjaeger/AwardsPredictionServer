@@ -91,7 +91,6 @@ export const get = dbWrapper<
  * - it will create a new predictionset for the next day
  * - we're comfortable with this so we don't overwrite the FINAL predictions for some leaderboard event
  * - the first prediction they make on the now-shortlisted category can just come the next day
- * TODO: untested
  */
 export const post = dbWrapper<
   {
@@ -108,8 +107,6 @@ export const post = dbWrapper<
     payload: { eventId, categoryName, predictions },
     authenticatedUserId
   }) => {
-    const startTime = performance.now(); // TODO: remove
-
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;
     }
@@ -323,14 +320,6 @@ export const post = dbWrapper<
     } finally {
       await session.endSession();
     }
-    const endTime = performance.now();
-
-    // TODO: remove
-    console.log(
-      'setItemsInCache.all took ' +
-        (endTime - startTime).toString() +
-        ' milliseconds.'
-    );
 
     return {
       statusCode: 200
