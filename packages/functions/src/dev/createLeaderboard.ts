@@ -18,13 +18,6 @@ import {
   type Accolade
 } from 'src/types/models';
 
-const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
-const TARGET_EVENT_YEAR: number = 2024;
-const PHASE: Phase = Phase.SHORTLIST;
-const INCLUDE_SHORT_FILMS: boolean = true;
-
-const client = new MongoClient(mongoClientUrl, mongoClientOptions);
-
 /**
    Leaderboard create index func:
    // SORT ON RISK:
@@ -53,6 +46,13 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
     }
   );
  */
+
+const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
+const TARGET_EVENT_YEAR: number = 2024;
+const PHASE: Phase = Phase.SHORTLIST;
+const INCLUDE_SHORT_FILMS: boolean = true;
+
+const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 const SHORT_CATEGORIES = [
   CategoryName.SHORT_ANIMATED,
@@ -130,7 +130,7 @@ export const handler = async () => {
     );
   }
   const predictionSets = await Promise.all(pSetReqs);
-  console.log('predictionSets', predictionSets.length);
+  console.log('predictionSets', predictionSets.length); // should = number of users
 
   // filters out non-shortlisted categories if we're compiling shortlist leaderboard
   // and it disregards categories that weren't live until accolades were given (aka previously unpredictable)
@@ -213,7 +213,7 @@ export const handler = async () => {
     };
   }
 
-  // add COMMUNITY predictions to leaderboardRankings (as though it's its own user)
+  // Get community stats
   const communityRiskiness = getLeaderboardRiskiness(
     PHASE,
     event,
@@ -232,11 +232,6 @@ export const handler = async () => {
   const communityPercentageAccuracy = formatPercentage(
     communityAccuratePredictionsTally / potentialCorrectPredictions
   );
-  leaderboardRankings.community = {
-    percentageAccuracy: communityPercentageAccuracy,
-    riskiness: communityRiskiness,
-    predictionSetId: communityPredictionSet._id
-  };
 
   // sort in order of rank (index 0 is #1)
   const sortedLeaderboardRankings = Object.entries(leaderboardRankings).sort(
@@ -264,9 +259,11 @@ export const handler = async () => {
 
   const topPercentageAccuracy =
     sortedLeaderboardRankings[0][1].percentageAccuracy;
+  // TODO: there are a bunch of ZEROs in here bringing down the average
   const medianPercentageAccuracy =
-    sortedLeaderboardRankings[sortedLeaderboardRankings.length / 2][1]
-      .percentageAccuracy;
+    sortedLeaderboardRankings[
+      Math.floor(sortedLeaderboardRankings.length / 2)
+    ][1].percentageAccuracy;
   const numPredicted = sortedLeaderboardRankings.length;
 
   const percentageAccuracyDistribution: {
@@ -279,17 +276,70 @@ export const handler = async () => {
     percentageAccuracyDistribution[ranking.percentageAccuracy] += 1;
   });
 
+  // Update the event to indicate that the leaderboard has been created
+
+  const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
+
+  const eventLeaderboard: iLeaderboard = {
+    // TODO: What about users who made an account then didn't do shit and got like 10%?
+    phase: PHASE,
+    noShorts: !!shouldDiscountShortFilms,
+    numPredicted,
+    topPercentageAccuracy,
+    medianPercentageAccuracy,
+    percentageAccuracyDistribution,
+    communityPercentageAccuracy,
+    communityRiskiness
+  };
+
+  console.log('updating event...');
+  try {
+    await db.collection<EventModel>('events').updateOne(
+      { _id: eventId },
+      {
+        $set: {
+          // this is how you set elements in arrays
+          [`leaderboards.${setKey as string}`]: eventLeaderboard
+        }
+      }
+    );
+  } catch (err: any) {
+    console.log(
+      'You may need to insert empty object on event (event.leaderboards = {})'
+    );
+    throw new Error(err);
+  }
+
   // Now we need to update the leaderboardRankings for each user
-  const requests = Promise.all(
+  const existingLeaderboardEntryRequests = Promise.all(
+    sortedLeaderboardRankings.map(async ([userId], i) => {
+      return await db.collection<User>('users').findOne({
+        _id: new ObjectId(userId),
+        leaderboardRankings: {
+          $elemMatch: {
+            eventId,
+            phase: PHASE,
+            noShorts: shouldDiscountShortFilms
+          }
+        }
+      });
+    })
+  );
+  console.log('getting existing user.leaderboardRankings...');
+  // Error: Argument passed in must be a string of 12 bytes or a string of 24 hex characters or an integer
+  const existingLeaderboardEntries = await existingLeaderboardEntryRequests;
+
+  const updateUserRequests = Promise.all(
     sortedLeaderboardRankings.map(
       async (
         [userId, { percentageAccuracy, predictionSetId, riskiness }],
         i
       ) => {
-        const promise = async () => {
-          const existingLeaderboardEntry = await db
-            .collection<User>('users')
-            .findOne({
+        const existingLeaderboardEntry = existingLeaderboardEntries[i];
+        if (existingLeaderboardEntry) {
+          // replace/update element
+          return await db.collection<User>('users').updateOne(
+            {
               _id: new ObjectId(userId),
               leaderboardRankings: {
                 $elemMatch: {
@@ -298,81 +348,41 @@ export const handler = async () => {
                   noShorts: shouldDiscountShortFilms
                 }
               }
-            });
-          if (existingLeaderboardEntry) {
-            // replace/update element
-            return await db.collection<User>('users').updateOne(
-              {
-                _id: new ObjectId(userId),
-                leaderboardRankings: {
-                  $elemMatch: {
-                    eventId,
-                    phase: PHASE,
-                    noShorts: shouldDiscountShortFilms
-                  }
-                }
-              },
-              {
-                $set: {
-                  'leaderboardRankings.$.percentageAccuracy':
-                    percentageAccuracy,
-                  'leaderboardRankings.$.predictionSetId': predictionSetId,
-                  'leaderboardRankings.$.rank': i + 1,
-                  'leaderboardRankings.$.riskiness': riskiness
-                }
+            },
+            {
+              $set: {
+                'leaderboardRankings.percentageAccuracy': percentageAccuracy,
+                'leaderboardRankings.predictionSetId': predictionSetId,
+                'leaderboardRankings.rank': i + 1,
+                'leaderboardRankings.riskiness': riskiness
               }
-            );
-          } else {
-            // add new element
-            const leaderboardRankings: iLeaderboardRanking = {
-              eventId,
-              phase: PHASE,
-              noShorts: shouldDiscountShortFilms,
-              percentageAccuracy,
-              yyyymmdd,
-              rank: i + 1,
-              riskiness
-            };
-            return await db.collection<User>('users').updateOne(
-              { _id: new ObjectId(userId) },
-              {
-                $push: {
-                  leaderboardRankings
-                }
+            }
+          );
+        } else {
+          // add new element
+          const leaderboardRankings: iLeaderboardRanking = {
+            eventId,
+            phase: PHASE,
+            noShorts: shouldDiscountShortFilms,
+            percentageAccuracy,
+            yyyymmdd,
+            rank: i + 1,
+            riskiness
+          };
+          return await db.collection<User>('users').updateOne(
+            { _id: new ObjectId(userId) },
+            {
+              $push: {
+                leaderboardRankings
               }
-            );
-          }
-        };
-        return promise;
+            }
+          );
+        }
       }
     )
   );
   console.log('updating user.leaderboardRankings...');
-  await requests;
-
-  // finally, update the event to indicate that the leaderboard has been created
-
-  const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
-
-  console.log('updating event...');
-  const eventLeaderboard: iLeaderboard = {
-    // TODO: What about users who made an account then didn't do shit and got like 10%?
-    phase: PHASE,
-    noShorts: !!shouldDiscountShortFilms,
-    numPredicted,
-    topPercentageAccuracy,
-    medianPercentageAccuracy,
-    percentageAccuracyDistribution
-  };
-
-  await db.collection<EventModel>('events').updateOne(
-    { _id: eventId },
-    {
-      $set: {
-        [setKey]: eventLeaderboard
-      }
-    }
-  );
+  await updateUserRequests;
 
   console.log('done!');
 };
