@@ -82,8 +82,6 @@ export const handler = async () => {
     return;
   }
 
-  // ERASE CURRENT USER.LEADERBOARDS:
-
   console.log('getting accolades...');
   const accolade = await db
     .collection<Accolade>('accolades')
@@ -185,8 +183,11 @@ export const handler = async () => {
     filteredCategories.forEach(([categoryName, categoryData]) => {
       const slots = getSlotsInPhase(PHASE, categoryData) as number; // ts is being dumb
       const numUserCategoryPredictions =
-        predictionSet.categories[categoryName as CategoryName].predictions
-          .length;
+        // note: "predictions" be undefined -- users may not predict every category
+        (
+          predictionSet.categories[categoryName as CategoryName]?.predictions ??
+          []
+        ).length;
       if (numUserCategoryPredictions < slots) {
         slotsLeftOpen += slots - numUserCategoryPredictions;
       }
