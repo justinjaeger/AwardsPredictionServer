@@ -50,7 +50,7 @@ export const handler = dbWrapper(client, async ({ db }) => {
   console.log('getting contenders...');
   const allContenders = await db
     .collection<Contender>('contenders')
-    .find({}, { projection: { _id: 1, isHidden: 1, accolade: 1 } })
+    .find({}, { projection: { _id: 1, isHidden: 1 } })
     .toArray();
   const indexedContenderIds: {
     [cId: string]: { isHidden?: boolean; accolade?: Phase };
