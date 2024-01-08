@@ -1,4 +1,4 @@
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient, ObjectId, type WithId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 import { SERVER_ERROR } from './types/responses';
@@ -9,7 +9,8 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
 const LEADERBOARD_PAGE_SIZE = 20;
 
-type iLeaderboardRankingsWithUserData = LeaderboardRanking & Partial<User>;
+type iLeaderboardRankingsWithUserData = LeaderboardRanking &
+  Partial<WithId<User>>;
 
 /**
  * Returns LeaderboardRankings and the users associated with them
