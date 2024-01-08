@@ -82,6 +82,8 @@ export const handler = async () => {
     return;
   }
 
+  // ERASE CURRENT USER.LEADERBOARDS:
+
   console.log('getting accolades...');
   const accolade = await db
     .collection<Accolade>('accolades')
@@ -91,8 +93,7 @@ export const handler = async () => {
     return;
   }
 
-  // We're going to find each user's most recent prediction set for this phase
-  // To find that, we're going to find the exact time that predictions closed on the event...
+  // Find the exact time that predictions closed on the event...
   const timeOfClose =
     PHASE === Phase.SHORTLIST
       ? event.shortlistDateTime
@@ -103,34 +104,7 @@ export const handler = async () => {
     console.log('no time of close found');
     return;
   }
-
-  // Then we need to find the proper yyyymmdd to query for
-  // Now all we need to do for this is to get yyyymmdd from the timeOfClose
   const yyyymmdd = dateToYyyymmdd(timeOfClose);
-
-  // Now we need to find the most recent for each user and community
-  // We're going to use the yyyymmdd to find the most recent prediction set for each user
-
-  console.log('getting community prediction...');
-  const communityPredictionSet = await db
-    .collection<PredictionSet>('predictionsets')
-    .findOne({ userId: 'community', eventId, yyyymmdd: { $lte: yyyymmdd } });
-  if (!communityPredictionSet) {
-    console.log('no community prediction set found; needed for riskiness');
-    return;
-  }
-
-  console.log('getting prediction sets...');
-  const pSetReqs: Array<Promise<WithId<PredictionSet> | null>> = [];
-  for (const user of allUsers) {
-    pSetReqs.push(
-      db
-        .collection<PredictionSet>('predictionsets')
-        .findOne({ userId: user._id, eventId, yyyymmdd: { $lte: yyyymmdd } })
-    );
-  }
-  const predictionSets = await Promise.all(pSetReqs);
-  console.log('predictionSets', predictionSets.length); // should = number of users
 
   // filters out non-shortlisted categories if we're compiling shortlist leaderboard
   // and it disregards categories that weren't live until accolades were given (aka previously unpredictable)
@@ -170,6 +144,29 @@ export const handler = async () => {
     potentialCorrectPredictions += slots;
   }
 
+  // We're going to use the yyyymmdd to find the prediction at or before target date
+
+  console.log('getting community prediction...');
+  const communityPredictionSet = await db
+    .collection<PredictionSet>('predictionsets')
+    .findOne({ userId: 'community', eventId, yyyymmdd: { $lte: yyyymmdd } });
+  if (!communityPredictionSet) {
+    console.log('no community prediction set found; needed for riskiness');
+    return;
+  }
+
+  console.log('getting prediction sets...');
+  const pSetReqs: Array<Promise<WithId<PredictionSet> | null>> = [];
+  for (const user of allUsers) {
+    pSetReqs.push(
+      db
+        .collection<PredictionSet>('predictionsets')
+        .findOne({ userId: user._id, eventId, yyyymmdd: { $lte: yyyymmdd } })
+    );
+  }
+  const predictionSets = await Promise.all(pSetReqs);
+  console.log('predictionSets', predictionSets.length); // should = number of users
+
   const leaderboardRankings: {
     [userId: string]: {
       percentageAccuracy: number;
@@ -180,6 +177,22 @@ export const handler = async () => {
 
   for (const predictionSet of predictionSets) {
     if (!predictionSet) {
+      continue;
+    }
+
+    // want to know the number of slots the user simply didn't have a prediction for
+    let slotsLeftOpen = 0;
+    filteredCategories.forEach(([categoryName, categoryData]) => {
+      const slots = getSlotsInPhase(PHASE, categoryData) as number; // ts is being dumb
+      const numUserCategoryPredictions =
+        predictionSet.categories[categoryName as CategoryName].predictions
+          .length;
+      if (numUserCategoryPredictions < slots) {
+        slotsLeftOpen += slots - numUserCategoryPredictions;
+      }
+    });
+    // FILTER: If the user failed to predict more than half of the potential slots, don't include them in the leaderboard
+    if (slotsLeftOpen > potentialCorrectPredictions / 2) {
       continue;
     }
 
@@ -234,32 +247,37 @@ export const handler = async () => {
   );
 
   // sort in order of rank (index 0 is #1)
-  const sortedLeaderboardRankings = Object.entries(leaderboardRankings).sort(
-    (
-      [userId1, { percentageAccuracy: pa1, riskiness: r1 }],
-      [userId2, { percentageAccuracy: pa2, riskiness: r2 }]
-    ) => {
-      // prioritize accuracy first
-      if (pa1 < pa2) {
-        return 1;
+  const sortedLeaderboardRankings = Object.entries(leaderboardRankings)
+    .filter(([userId, { percentageAccuracy }]) => {
+      // filter out users who didn't make any predictions
+      // er, maybe we should do this at a different level?
+      return percentageAccuracy > 0;
+    })
+    .sort(
+      (
+        [userId1, { percentageAccuracy: pa1, riskiness: r1 }],
+        [userId2, { percentageAccuracy: pa2, riskiness: r2 }]
+      ) => {
+        // prioritize accuracy first
+        if (pa1 < pa2) {
+          return 1;
+        }
+        if (pa1 > pa2) {
+          return -1;
+        }
+        // but if equal, prefer the riskier predictions
+        if (r1 < r2) {
+          return 1;
+        }
+        if (r1 > r2) {
+          return -1;
+        }
+        return 0;
       }
-      if (pa1 > pa2) {
-        return -1;
-      }
-      // but if equal, prefer the riskier predictions
-      if (r1 < r2) {
-        return 1;
-      }
-      if (r1 > r2) {
-        return -1;
-      }
-      return 0;
-    }
-  );
+    );
 
   const topPercentageAccuracy =
     sortedLeaderboardRankings[0][1].percentageAccuracy;
-  // TODO: there are a bunch of ZEROs in here bringing down the average
   const medianPercentageAccuracy =
     sortedLeaderboardRankings[
       Math.floor(sortedLeaderboardRankings.length / 2)
@@ -281,7 +299,6 @@ export const handler = async () => {
   const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
 
   const eventLeaderboard: iLeaderboard = {
-    // TODO: What about users who made an account then didn't do shit and got like 10%?
     phase: PHASE,
     noShorts: !!shouldDiscountShortFilms,
     numPredicted,

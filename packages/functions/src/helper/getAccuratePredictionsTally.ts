@@ -44,16 +44,13 @@ export const getAccuratePredictionsTally = (
       .slice(0, slots)
       .map((p) => p.contenderId.toString());
 
-    const predictedContenderIdsWithAccolade: string[] = [];
     predictedContenderIds.forEach((cId) => {
       const accolade = getContenderAccolade(cId);
       const hasAccoladeOrAbove = getHasAccoladeOrAbove(eventPhase, accolade);
       if (hasAccoladeOrAbove) {
-        predictedContenderIdsWithAccolade.push(cId);
+        totalCorrectPredictions += 1;
       }
     });
-
-    totalCorrectPredictions += predictedContenderIdsWithAccolade.length;
   }
   return totalCorrectPredictions;
 };
