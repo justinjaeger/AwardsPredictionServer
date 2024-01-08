@@ -1,8 +1,8 @@
-import { MongoClient, ObjectId, type WithId } from 'mongodb';
+import { MongoClient, ObjectId, type UpdateResult, type WithId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from 'src/helper/connect';
 import { formatPercentage } from 'src/helper/formatPercentage';
 import { getAccuratePredictionsTally } from 'src/helper/getAccuratePredictionsTally';
-import { getEventLeaderboardsKey } from 'src/helper/getEventLeaderboardsKey';
+import { getPhaseNoShortsKey } from 'src/helper/getPhaseNoShortsKey';
 import { getLeaderboardRiskiness } from 'src/helper/getLeaderboardRiskiness';
 import { getSlotsInPhase } from 'src/helper/getSlotsInPhase';
 import { dateToYyyymmdd } from 'src/helper/utils';
@@ -15,8 +15,10 @@ import {
   CategoryName,
   type iLeaderboard,
   type iLeaderboardRanking,
-  type Accolade
+  type Accolade,
+  type LeaderboardRanking
 } from 'src/types/models';
+import { SERVER_ERROR } from 'src/types/responses';
 
 /**
    Leaderboard create index func:
@@ -169,7 +171,6 @@ export const handler = async () => {
     [userId: string]: {
       percentageAccuracy: number;
       riskiness: number;
-      predictionSetId: ObjectId;
     };
   } = {};
 
@@ -222,8 +223,7 @@ export const handler = async () => {
     const userId = predictionSet.userId.toString();
     leaderboardRankings[userId] = {
       percentageAccuracy,
-      riskiness,
-      predictionSetId: predictionSet._id
+      riskiness
     };
   }
 
@@ -297,7 +297,7 @@ export const handler = async () => {
 
   // Update the event to indicate that the leaderboard has been created
 
-  const setKey = getEventLeaderboardsKey(PHASE, shouldDiscountShortFilms);
+  const phaseNoShortsKey = getPhaseNoShortsKey(PHASE, shouldDiscountShortFilms);
 
   const eventLeaderboard: iLeaderboard = {
     phase: PHASE,
@@ -310,97 +310,85 @@ export const handler = async () => {
     communityRiskiness
   };
 
-  console.log('updating event...');
-  try {
-    await db.collection<EventModel>('events').updateOne(
-      { _id: eventId },
-      {
-        $set: {
-          // this is how you set elements in arrays
-          [`leaderboards.${setKey as string}`]: eventLeaderboard
-        }
+  const eventUpdateRequest = db.collection<EventModel>('events').updateOne(
+    { _id: eventId },
+    {
+      $set: {
+        // this is how you set elements in arrays
+        [`leaderboards.${phaseNoShortsKey as string}`]: eventLeaderboard
       }
-    );
-  } catch (err: any) {
-    console.log(
-      'You may need to insert empty object on event (event.leaderboards = {})'
-    );
-    throw new Error(err);
-  }
+    }
+  );
 
   // Now we need to update the leaderboardRankings for each user
-  const existingLeaderboardEntryRequests = Promise.all(
-    sortedLeaderboardRankings.map(async ([userId], i) => {
-      return await db.collection<User>('users').findOne({
-        _id: new ObjectId(userId),
-        leaderboardRankings: {
-          $elemMatch: {
+  // This involves duplicating the leaderboardRankings data
+  // in both the User and the LeaderboardRankings collection
+
+  const updateUserRequests: Array<Promise<UpdateResult<User>>> = [];
+  const updateLeaderboardRankingsRequests: Array<
+    Promise<UpdateResult<LeaderboardRanking>>
+  > = [];
+  sortedLeaderboardRankings.forEach(
+    ([userId, { percentageAccuracy, riskiness }], i) => {
+      const leaderboardRankings: iLeaderboardRanking = {
+        eventId,
+        phase: PHASE,
+        noShorts: shouldDiscountShortFilms,
+        percentageAccuracy,
+        yyyymmdd,
+        rank: i + 1,
+        riskiness
+      };
+      updateUserRequests.push(
+        db.collection<User>('users').updateOne(
+          { _id: new ObjectId(userId) },
+          {
+            $set: {
+              [`leaderboardRankings.${eventId.toString() as string}.${
+                phaseNoShortsKey as string
+              }`]: leaderboardRankings
+            }
+          }
+        )
+      );
+      updateLeaderboardRankingsRequests.push(
+        db.collection<LeaderboardRanking>('leaderboardrankings').updateOne(
+          {
+            userId: new ObjectId(userId),
             eventId,
             phase: PHASE,
             noShorts: shouldDiscountShortFilms
+          },
+          {
+            $set: { userId: new ObjectId(userId), ...leaderboardRankings }
+          },
+          {
+            upsert: true
           }
-        }
-      });
-    })
+        )
+      );
+    }
   );
-  console.log('getting existing user.leaderboardRankings...');
-  // Error: Argument passed in must be a string of 12 bytes or a string of 24 hex characters or an integer
-  const existingLeaderboardEntries = await existingLeaderboardEntryRequests;
 
-  const updateUserRequests = Promise.all(
-    sortedLeaderboardRankings.map(
-      async (
-        [userId, { percentageAccuracy, predictionSetId, riskiness }],
-        i
-      ) => {
-        const existingLeaderboardEntry = existingLeaderboardEntries[i];
-        if (existingLeaderboardEntry) {
-          // replace/update element
-          return await db.collection<User>('users').updateOne(
-            {
-              _id: new ObjectId(userId),
-              leaderboardRankings: {
-                $elemMatch: {
-                  eventId,
-                  phase: PHASE,
-                  noShorts: shouldDiscountShortFilms
-                }
-              }
-            },
-            {
-              $set: {
-                'leaderboardRankings.percentageAccuracy': percentageAccuracy,
-                'leaderboardRankings.predictionSetId': predictionSetId,
-                'leaderboardRankings.rank': i + 1,
-                'leaderboardRankings.riskiness': riskiness
-              }
-            }
-          );
-        } else {
-          // add new element
-          const leaderboardRankings: iLeaderboardRanking = {
-            eventId,
-            phase: PHASE,
-            noShorts: shouldDiscountShortFilms,
-            percentageAccuracy,
-            yyyymmdd,
-            rank: i + 1,
-            riskiness
-          };
-          return await db.collection<User>('users').updateOne(
-            { _id: new ObjectId(userId) },
-            {
-              $push: {
-                leaderboardRankings
-              }
-            }
-          );
-        }
-      }
-    )
-  );
-  console.log('updating user.leaderboardRankings...');
-  await updateUserRequests;
+  const session = client.startSession();
+  try {
+    await session.withTransaction(async () => {
+      console.log('updating event...');
+      await eventUpdateRequest;
+      console.log('updating User.leaderboardRankings...');
+      await Promise.all(updateUserRequests);
+      console.log('updating leaderboardrankings...');
+      await Promise.all(updateLeaderboardRankingsRequests);
+    });
+  } catch (e) {
+    console.error('error updating predictionset:', e);
+    return {
+      ...SERVER_ERROR.Error,
+      message: `Error updating createLeaderboard`
+    };
+  } finally {
+    await session.endSession();
+  }
 
   console.log('done!');
 };

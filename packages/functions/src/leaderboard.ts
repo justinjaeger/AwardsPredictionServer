@@ -2,27 +2,32 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 import { SERVER_ERROR } from './types/responses';
-import {
-  type Relationship,
-  type RelationshipWithUser,
-  type User
-} from './types/models';
-import { getAggregatePagination, paginateCursor } from './helper/utils';
+import { type LeaderboardRanking, type Phase, type User } from './types/models';
+import { paginateCursor } from './helper/utils';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
-const LEADERBOARD_PAGE_SIZE = 25;
+const LEADERBOARD_PAGE_SIZE = 20;
 
+type iLeaderboardRankingsWithUserData = LeaderboardRanking & Partial<User>;
+
+/**
+ * Returns LeaderboardRankings and the users associated with them
+ * Users are returned with only what's necessary to list them
+ */
 export const get = dbWrapper<
   undefined,
-  { users: Array<Partial<User>>; hasNextPage: boolean }
+  {
+    leaderboardRankingsWithUserData: iLeaderboardRankingsWithUserData[];
+    hasNextPage: boolean;
+  }
 >(
   client,
   async ({
     db,
     params: {
       eventId,
-      phase,
+      phase: phaseAsString,
       pageNum: pageNumAsString,
       noShorts: noShortsAsString,
       sortByField = 'rank', // can be rank, riskiness (as long as they are indexed!!)
@@ -31,133 +36,59 @@ export const get = dbWrapper<
   }) => {
     const noShorts = noShortsAsString === 'true';
     const pageNum = pageNumAsString ? parseInt(pageNumAsString) : undefined;
+    const phase = phaseAsString as Phase;
 
     if (!eventId || !phase || !pageNum) {
       return SERVER_ERROR.BadRequest;
     }
 
     const searchCursor = db
+      .collection<LeaderboardRanking>('leaderboardrankings')
+      .find({
+        eventId: new ObjectId(eventId),
+        phase,
+        noShorts
+      })
+      .sort({
+        [sortByField]: sortOrder === 'desc' ? -1 : 1
+      }); // TODO: should be supported by an index!! double check
+    paginateCursor(searchCursor, pageNum, LEADERBOARD_PAGE_SIZE);
+
+    const leaderboardRankings = await searchCursor.toArray();
+    const hasNextPage = leaderboardRankings.length === LEADERBOARD_PAGE_SIZE;
+
+    const userIds = leaderboardRankings.map(({ userId }) => userId);
+    const users = await db
       .collection<User>('users')
       .find(
-        {
-          leaderboardRankings: {
-            $elemMatch: {
-              eventId,
-              phase,
-              noShorts
-            }
-          }
-        },
+        { _id: { $in: userIds } },
         {
           projection: {
             _id: 1,
             username: 1,
             name: 1,
-            image: 1,
-            leaderboardRankings: {
-              $elemMatch: {
-                eventId,
-                phase,
-                noShorts
-              }
-            }
+            image: 1
           }
         }
       )
-      .sort({
-        [`leaderboardRankings.${sortByField}`]: sortOrder === 'desc' ? -1 : 1
-      }); // TODO: should be supported by an index!! double check
-    paginateCursor(searchCursor, pageNum, LEADERBOARD_PAGE_SIZE);
-    const userList = await searchCursor.toArray();
-
-    return {
-      statusCode: 200,
-      data: {
-        users: userList,
-        hasNextPage: userList.length === LEADERBOARD_PAGE_SIZE
-      }
-    };
-  }
-);
-
-const FOLLOWING_LEADERBOARD_RESULTS_COUNT = 10;
-
-export const leaderboardFromFollowing = dbWrapper<
-  undefined,
-  { users: Array<Partial<User>>; hasNextPage: boolean }
->(
-  client,
-  async ({
-    db,
-    params: {
-      userId,
-      eventId,
-      phase,
-      noShorts: noShortsAsString,
-      pageNumber: pageNumberAsString,
-      sortByField = 'rank', // can be rank, riskiness (as long as they are indexed!!)
-      sortOrder = 'asc' // can be asc, desc
-    }
-  }) => {
-    const noShorts = noShortsAsString === 'true';
-    const pageNum = pageNumberAsString
-      ? parseInt(pageNumberAsString)
-      : undefined;
-
-    if (!userId || !eventId || !phase || !pageNum) {
-      return SERVER_ERROR.BadRequest;
-    }
-
-    const lookup: any = {
-      from: 'users',
-      localField: 'followedUserId',
-      foreignField: '_id',
-      as: 'followedUserList'
-    };
-    lookup.pipeline = [
-      {
-        $project: {
-          username: 1,
-          name: 1,
-          image: 1,
-          leaderboardRankings: {
-            $elemMatch: {
-              eventId,
-              phase,
-              noShorts
-            }
-          }
-        },
-        // TODO: Not sure if this will work but, it's my best guess
-        ...getAggregatePagination(pageNum, FOLLOWING_LEADERBOARD_RESULTS_COUNT),
-        $sort: {
-          [`leaderboardRankings.${sortByField}`]: sortOrder === 'desc' ? -1 : 1
-        }
-      }
-    ];
-
-    const followedUsers = await db
-      .collection<Relationship>('relationships')
-      .aggregate<RelationshipWithUser>([
-        {
-          $match: {
-            followingUserId: new ObjectId(userId)
-          }
-        },
-        {
-          $project: { _id: 0, followedUserId: 1 }
-        },
-        { $lookup: lookup }
-      ])
-      .map(({ followedUserList }) => followedUserList[0])
       .toArray();
 
+    const mergedData: iLeaderboardRankingsWithUserData[] =
+      leaderboardRankings.map((ranking) => {
+        const user = users.find(({ _id }) => _id.equals(ranking.userId));
+        return {
+          ...ranking,
+          username: user?.username,
+          name: user?.name,
+          image: user?.image
+        };
+      });
+
     return {
       statusCode: 200,
       data: {
-        users: followedUsers,
-        hasNextPage:
-          followedUsers.length === FOLLOWING_LEADERBOARD_RESULTS_COUNT
+        leaderboardRankingsWithUserData: mergedData,
+        hasNextPage
       }
     };
   }
