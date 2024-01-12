@@ -20,35 +20,6 @@ import {
 } from 'src/types/models';
 import { SERVER_ERROR } from 'src/types/responses';
 
-/**
-   Leaderboard create index func:
-   // SORT ON RISK:
-   await db.collection<User>('users').createIndex(
-    {
-      'leaderboardRankings.eventId': 1,
-      'leaderboardRankings.phase': 1,
-      'leaderboardRankings.noShorts': 1,
-      'leaderboardRankings.rank': 1
-    },
-    {
-      unique: true,
-      partialFilterExpression: { leaderboardRankings: { $exists: true } }
-    }
-  );
-  // SORT ON RISKINESS
-  await db.collection<User>('users').createIndex(
-    {
-      'leaderboardRankings.eventId': 1,
-      'leaderboardRankings.phase': 1,
-      'leaderboardRankings.noShorts': 1,
-      'leaderboardRankings.riskiness': 1
-    },
-    {
-      partialFilterExpression: { leaderboardRankings: { $exists: true } }
-    }
-  );
- */
-
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 const TARGET_EVENT_YEAR: number = 2024;
 const PHASE: Phase = Phase.SHORTLIST;
