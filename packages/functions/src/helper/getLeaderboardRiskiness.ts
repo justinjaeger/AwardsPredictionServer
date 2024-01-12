@@ -57,6 +57,9 @@ export const getLeaderboardRiskiness = (
       // loop through community predictions for the given category
       // when we find a prediction that the user made, AND the contender has gotten the accolade
       // add to the riskiness score
+      // each correct prediction has the potential of 0-100 riskiness points
+      // 0 means 100% of ALL users predicted the contender
+      // 100 means 0% of users predicted the contender
       communityPredictions.forEach((communityPrediction) => {
         if (!communityPrediction.numPredicting) {
           return;
