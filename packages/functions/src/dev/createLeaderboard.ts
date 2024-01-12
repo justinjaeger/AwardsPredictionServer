@@ -277,6 +277,12 @@ export const handler = async () => {
       }
     );
 
+  const communityPerformedBetterThanNumUsers = sortedLeaderboardRankings.filter(
+    ([, ranking], i) => {
+      return ranking.percentageAccuracy < communityPercentageAccuracy;
+    }
+  ).length;
+
   const topPercentageAccuracy =
     sortedLeaderboardRankings[0][1].percentageAccuracy;
   const medianPercentageAccuracy =
@@ -307,6 +313,7 @@ export const handler = async () => {
     medianPercentageAccuracy,
     percentageAccuracyDistribution,
     communityPercentageAccuracy,
+    communityPerformedBetterThanNumUsers,
     communityRiskiness
   };
 
