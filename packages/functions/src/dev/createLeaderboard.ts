@@ -5,7 +5,6 @@ import { getAccuratePredictionsTally } from 'src/helper/getAccuratePredictionsTa
 import { getPhaseNoShortsKey } from 'src/helper/getPhaseNoShortsKey';
 import { getLeaderboardRiskiness } from 'src/helper/getLeaderboardRiskiness';
 import { getSlotsInPhase } from 'src/helper/getSlotsInPhase';
-import { dateToYyyymmdd } from 'src/helper/utils';
 import {
   AwardsBody,
   type EventModel,
@@ -19,6 +18,7 @@ import {
   type LeaderboardRanking
 } from 'src/types/models';
 import { SERVER_ERROR } from 'src/types/responses';
+import { dateToYyyymmdd } from 'src/helper/utils';
 
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 const TARGET_EVENT_YEAR: number = 2024;
@@ -142,6 +142,7 @@ export const handler = async () => {
     [userId: string]: {
       percentageAccuracy: number;
       riskiness: number;
+      numCorrect: number;
     };
   } = {};
 
@@ -194,7 +195,8 @@ export const handler = async () => {
     const userId = predictionSet.userId.toString();
     leaderboardRankings[userId] = {
       percentageAccuracy,
-      riskiness
+      riskiness,
+      numCorrect: accuratePredictionsTally
     };
   }
 
@@ -260,7 +262,7 @@ export const handler = async () => {
     sortedLeaderboardRankings[
       Math.floor(sortedLeaderboardRankings.length / 2)
     ][1].percentageAccuracy;
-  const numPredicted = sortedLeaderboardRankings.length;
+  const numUsersPredicting = sortedLeaderboardRankings.length;
 
   const percentageAccuracyDistribution: {
     [percentageAccuracy: number]: number;
@@ -279,13 +281,15 @@ export const handler = async () => {
   const eventLeaderboard: iLeaderboard = {
     phase: PHASE,
     noShorts: !!shouldDiscountShortFilms,
-    numPredicted,
+    numUsersPredicting,
     topPercentageAccuracy,
     medianPercentageAccuracy,
     percentageAccuracyDistribution,
     communityPercentageAccuracy,
     communityPerformedBetterThanNumUsers,
-    communityRiskiness
+    communityRiskiness,
+    communityNumCorrect: communityAccuratePredictionsTally,
+    totalPossibleSlots: potentialCorrectPredictions
   };
 
   const eventUpdateRequest = db.collection<EventModel>('events').updateOne(
@@ -307,7 +311,7 @@ export const handler = async () => {
     Promise<UpdateResult<LeaderboardRanking>>
   > = [];
   sortedLeaderboardRankings.forEach(
-    ([userId, { percentageAccuracy, riskiness }], i) => {
+    ([userId, { percentageAccuracy, numCorrect, riskiness }], i) => {
       const leaderboardRankings: iLeaderboardRanking = {
         eventId,
         phase: PHASE,
@@ -315,7 +319,10 @@ export const handler = async () => {
         percentageAccuracy,
         yyyymmdd,
         rank: i + 1,
-        riskiness
+        riskiness,
+        numCorrect,
+        totalPossibleSlots: potentialCorrectPredictions,
+        numUsersPredicting
       };
       updateUserRequests.push(
         db.collection<User>('users').updateOne(

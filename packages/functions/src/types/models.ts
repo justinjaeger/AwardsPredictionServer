@@ -112,7 +112,7 @@ export type Contender = {
   personTmdbId?: number;
   songId?: string;
   isHidden?: boolean;
-  numPredicting?: Record<number, number>; // for community predictions only
+  numUsersPredicting?: Record<number, number>; // for community predictions only
   amplify_id?: string;
 };
 
@@ -131,13 +131,15 @@ export type iCategory = {
 export type iLeaderboard = {
   phase: Phase;
   noShorts: boolean;
-  numPredicted: number;
+  numUsersPredicting: number;
   topPercentageAccuracy: number;
   medianPercentageAccuracy: number;
   communityPercentageAccuracy: number;
   communityRiskiness: number;
   communityPerformedBetterThanNumUsers: number;
+  communityNumCorrect: number;
   percentageAccuracyDistribution: { [percentageAccuracy: number]: number };
+  totalPossibleSlots: number;
 };
 
 // overall aggregate data on event leaderboards
@@ -266,6 +268,9 @@ export type iLeaderboardRanking = {
   rank: number;
   riskiness: number;
   percentageAccuracy: number;
+  numCorrect: number;
+  totalPossibleSlots: number;
+  numUsersPredicting: number;
   yyyymmdd: number; // date of close
 };
 
