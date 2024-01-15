@@ -3,7 +3,6 @@ import { dbWrapper } from './helper/wrapper';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 import { SERVER_ERROR } from './types/responses';
 import { type LeaderboardRanking, type Phase, type User } from './types/models';
-import { paginateCursor } from './helper/utils';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
@@ -43,19 +42,22 @@ export const get = dbWrapper<
       return SERVER_ERROR.BadRequest;
     }
 
-    const searchCursor = db
+    const leaderboardRankings = await db
       .collection<LeaderboardRanking>('leaderboardrankings')
       .find({
         eventId: new ObjectId(eventId),
         phase,
-        noShorts
+        noShorts,
+        rank: {
+          $lte: pageNum * LEADERBOARD_PAGE_SIZE,
+          $gt: (pageNum - 1) * LEADERBOARD_PAGE_SIZE
+        }
       })
       .sort({
         [sortByField]: sortOrder === 'desc' ? -1 : 1
-      }); // TODO: should be supported by an index!! double check
-    paginateCursor(searchCursor, pageNum, LEADERBOARD_PAGE_SIZE);
+      })
+      .toArray();
 
-    const leaderboardRankings = await searchCursor.toArray();
     const hasNextPage = leaderboardRankings.length === LEADERBOARD_PAGE_SIZE;
 
     const userIds = leaderboardRankings.map(({ userId }) => userId);
