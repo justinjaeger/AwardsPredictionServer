@@ -7,8 +7,7 @@ import {
 } from 'src/types/models';
 import { getSlotsInPhase } from './getSlotsInPhase';
 import { getHasAccoladeOrAbove } from './getHasAccoladeOrAbove';
-import { getContenderStats } from './getContenderStats';
-import { formatPercentage } from './formatPercentage';
+import { getContenderRiskiness } from './getContenderRiskiness';
 
 /**
  * Note that riskiness is only added to for when the risk pays off
@@ -77,14 +76,12 @@ export const getLeaderboardRiskiness = (
 
         // take the num users predicting the contender vs the num users predicting the category overall
         if (contenderHasAccolade && userPredictedTheContender) {
-          const { numPredictingWithinSlots } = getContenderStats(
+          const contenderRiskines = getContenderRiskiness(
             communityPrediction.numPredicting,
-            slots
+            slots,
+            totalUsersPredicting
           );
-          const percentageOfUsersPredicting = formatPercentage(
-            numPredictingWithinSlots / totalUsersPredicting
-          );
-          riskiness += 100 - percentageOfUsersPredicting;
+          riskiness += contenderRiskines;
         }
       });
     }

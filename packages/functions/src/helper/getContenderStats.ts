@@ -7,22 +7,24 @@ export type iContenderStats = {
 
 /**
  * Gets summary data on where users are predicting a contender to be nominated
+ * MUST be in sync with frontend!
  */
 export const getContenderStats = (
   numPredicting: Record<number, number>,
-  slotsInCategory: number = 5
+  slotsInCategory = 5
 ): iContenderStats => {
   return Object.entries(numPredicting).reduce(
     (acc, [slotNum, numUsersPredicting]) => {
       const slotNumber = parseInt(slotNum, 10);
 
-      if (slotNumber >= slotsInCategory + 5) {
-        acc.numPredictingAnySlot += numUsersPredicting;
-      } else if (slotNumber >= slotsInCategory) {
+      acc.numPredictingAnySlot += numUsersPredicting;
+      if (slotNumber <= slotsInCategory + 5) {
         acc.numPredictingWithinFiveSlots += numUsersPredicting;
-      } else if (slotNumber > 1) {
+      }
+      if (slotNumber <= slotsInCategory) {
         acc.numPredictingWithinSlots += numUsersPredicting;
-      } else {
+      }
+      if (slotNumber === 1) {
         acc.numPredictingWin += numUsersPredicting;
       }
       return acc;
@@ -35,18 +37,3 @@ export const getContenderStats = (
     }
   );
 };
-
-// /**
-//  * Gets the total number of users predicting a contender in any position
-//  */
-// export const getTotalNumPredicting = (numPredicting: Record<number, number>) =>
-//   Object.values(numPredicting || {}).reduce((acc, numPredicting) => {
-//     return acc + numPredicting;
-//   }, 0);
-
-//   /**
-//    * a
-//    */
-//   export const totalNumPredictingCategory =
-//           communityPredictions.categories[category as CategoryName]
-//             .totalUsersPredicting ?? totalNumPredictingTop;
