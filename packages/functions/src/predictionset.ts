@@ -45,7 +45,7 @@ export const get = dbWrapper<
     params: {
       userId,
       eventId,
-      yyyymmdd: yyyymmddString,
+      yyyymmdd: yyyymmddString, // NOTE: for this, looks for this date OR EARLIER
       categoryName,
       predictionSetId
     }
@@ -60,7 +60,7 @@ export const get = dbWrapper<
     // if we want a specific date, we pass yyyymmdd
     // else, we'll just return the most recent
     if (yyyymmdd) {
-      filter.yyyymmdd = yyyymmdd;
+      filter.yyyymmdd = { $lte: yyyymmdd };
     } else {
       options.sort = { yyyymmdd: -1 };
     }
