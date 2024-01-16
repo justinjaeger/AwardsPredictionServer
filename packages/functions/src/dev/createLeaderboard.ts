@@ -77,6 +77,13 @@ export const handler = async () => {
   }
   const yyyymmdd = dateToYyyymmdd(timeOfClose);
 
+  // DELETE ALL EXISTING LEADERBOARD DATA FOR THIS EVENT (if re-running a script)
+  // await db.collection<LeaderboardRanking>('leaderboardrankings').deleteMany({
+  //   eventId,
+  //   phase: PHASE,
+  //   noShorts: shouldDiscountShortFilms
+  // });
+
   // filters out non-shortlisted categories if we're compiling shortlist leaderboard
   // and it disregards categories that weren't live until accolades were given (aka previously unpredictable)
   const filteredCategories = Object.entries(event.categories).filter(
