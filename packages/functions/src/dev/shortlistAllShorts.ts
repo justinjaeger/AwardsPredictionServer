@@ -25,7 +25,7 @@ export const handler = async () => {
   try {
     const event = await mongodb
       .collection<Event>('events')
-      .findOne({ eventYear: YEAR, awardsBody: AWARDS_BODY });
+      .findOne({ year: YEAR, awardsBody: AWARDS_BODY });
 
     if (!event)
       throw new Error(
@@ -55,8 +55,8 @@ export const handler = async () => {
       eventId: event._id
     });
     const currentAccolades = res?.accolades ?? {};
-    const current = currentAccolades.accolades;
-    const newAccolades = Object.assign(current, contenderIdToPhase);
+    // error: cannot convert undefined or null to object
+    const newAccolades = Object.assign(currentAccolades, contenderIdToPhase);
 
     // update all shortlisted contenders
     await mongodb
