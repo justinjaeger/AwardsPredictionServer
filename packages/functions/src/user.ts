@@ -326,7 +326,7 @@ export const remove = dbWrapper<Partial<User>, {}>(
           followerCount: 0,
           followingCount: 0,
           eventsPredicting: {},
-          leaderboardRankings: [],
+          leaderboardRankings: {},
           categoriesPredicting: {},
           recentPredictionSets: [],
           role: UserRole.USER,
