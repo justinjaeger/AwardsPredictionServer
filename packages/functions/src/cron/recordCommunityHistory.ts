@@ -53,7 +53,7 @@ export const handler = dbWrapper(client, async ({ db }) => {
     .find({}, { projection: { _id: 1, isHidden: 1 } })
     .toArray();
   const indexedContenderIds: {
-    [cId: string]: { isHidden?: boolean; accolade?: Phase };
+    [cId: string]: { isHidden?: boolean };
   } = {};
   allContenders.forEach(({ _id, isHidden }) => {
     indexedContenderIds[_id.toString()] = { isHidden };
@@ -157,13 +157,13 @@ export const handler = dbWrapper(client, async ({ db }) => {
             isShortlistedCategory &&
             !someContendersAreNominated;
           const contenderHasBeenShortlisted =
-            indexedContenderIds[contenderId].accolade === Phase.SHORTLIST;
+            contenderIdToAccolade[contenderId] === Phase.SHORTLIST;
           if (shouldFilterByIsShortlisted && !contenderHasBeenShortlisted) {
             continue;
           }
           // filter for nominations, if that's happened
           const contenderHasBeenNominated =
-            indexedContenderIds[contenderId].accolade !== Phase.NOMINATION;
+            contenderIdToAccolade[contenderId] === Phase.NOMINATION;
           if (someContendersAreNominated && contenderHasBeenNominated) {
             continue;
           }
