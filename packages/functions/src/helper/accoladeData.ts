@@ -128,6 +128,171 @@ export const AMPAS_2024_NOMS: iAccoladeData = {
   awardsBody: AwardsBody.ACADEMY_AWARDS,
   year: 2024,
   data: {
-    [CategoryName.ACTRESS]: ['Lily Gladstone*Killers of the Flower Moon']
+    [CategoryName.PICTURE]: [
+      'American Fiction',
+      'Anatomy of a Fall',
+      'Barbie',
+      'The Holdovers',
+      'Killers of the Flower Moon',
+      'Maestro',
+      'Oppenheimer',
+      'Past Lives',
+      'Poor Things',
+      'The Zone of Interest'
+    ],
+    [CategoryName.ACTOR]: [
+      'Bradley Cooper*Maestro',
+      'Colman Domingo*Rustin',
+      'Paul Giamatti*The Holdovers',
+      'Cillian Murphy*Oppenheimer',
+      'Jeffrey Wright*American Fiction'
+    ],
+    [CategoryName.ACTRESS]: [
+      'Annette Bening*Nyad',
+      'Lily Gladstone*Killers of the Flower Moon',
+      'Sandra Hüller*Anatomy of a Fall',
+      'Carey Mulligan*Maestro',
+      'Emma Stone*Poor Things'
+    ],
+    [CategoryName.SUPPORTING_ACTOR]: [
+      'Sterling K. Brown*American Fiction',
+      'Robert De Niro*Killers of the Flower Moon',
+      'Robert Downey Jr.*Oppenheimer',
+      'Ryan Gosling*Barbie',
+      'Mark Ruffalo*Poor Things'
+    ],
+    [CategoryName.SUPPORTING_ACTRESS]: [
+      'Emily Blunt*Oppenheimer',
+      'Danielle Brooks*The Color Purple',
+      'America Ferrera*Barbie',
+      'Jodie Foster*Nyad',
+      `Da'Vine Joy Randolph*The Holdovers`
+    ],
+    [CategoryName.DIRECTOR]: [
+      'The Zone of Interest',
+      'Poor Things',
+      'Oppenheimer',
+      'Killers of the Flower Moon',
+      'Anatomy of a Fall'
+    ],
+    [CategoryName.INTERNATIONAL]: [
+      'The Captain',
+      'Perfect Days',
+      'Society of the Snow',
+      'The Teachers’ Lounge',
+      'The Zone of Interest'
+    ],
+    [CategoryName.ANIMATED]: [
+      'The Boy and the Heron',
+      'Elemental',
+      'Nimona',
+      'Robot Dreams',
+      'Spider-Man: Across the Spider-Verse'
+    ],
+    [CategoryName.ADAPTED_SCREENPLAY]: [
+      'American Fiction',
+      'Barbie',
+      'Oppenheimer',
+      'Poor Things',
+      'The Zone of Interest'
+    ],
+    [CategoryName.ORIGINAL_SCREENPLAY]: [
+      'Anatomy of a Fall',
+      'The Holdovers',
+      'Maestro',
+      'May December',
+      'Past Lives'
+    ],
+    [CategoryName.SHORT_ANIMATED]: [
+      'Letter to a Pig',
+      'Ninety-Five Senses',
+      'Our Uniform',
+      'Pachyderm',
+      'WAR IS OVER! Inspired by the Music of John and Yoko'
+    ],
+    [CategoryName.SHORT_LIVE_ACTION]: [
+      'The After',
+      'Invincible',
+      'Knight of Fortune',
+      'Red, White and Blue',
+      'The Wonderful Story of Henry Sugar'
+    ],
+    [CategoryName.SHORT_DOCUMENTARY]: [
+      'The ABCs of Book Banning',
+      'The Barber of Little Rock',
+      'Island In Between',
+      'The Last Repair Shop',
+      'Grandma & Grandma'
+    ],
+    [CategoryName.SCORE]: [
+      'American Fiction',
+      'Indiana Jones and the Dial of Destiny',
+      'Killers of the Flower Moon',
+      'Oppenheimer',
+      'Poor Things'
+    ],
+    [CategoryName.SONG]: [
+      '1171816-It Never Went Away',
+      `346698-I'm Just Ken`,
+      '346698-What Was I Made For?',
+      '626332-The Fire Inside',
+      '466420-Wahzhazhe'
+    ],
+    [CategoryName.COSTUMES]: [
+      'Barbie',
+      'Killers of the Flower Moon',
+      'Napoleon',
+      'Oppenheimer',
+      'Poor Things'
+    ],
+    [CategoryName.MAKEUP]: [
+      'Golda',
+      'Maestro',
+      'Oppenheimer',
+      'Poor Things',
+      'Society of the Snow'
+    ],
+    [CategoryName.DOCUMENTARY]: [
+      `Bobi Wine: The People's President`,
+      'The Eternal Memory',
+      'Four Daughters',
+      'To Kill A Tiger',
+      '20 Days in Mariupol'
+    ],
+    [CategoryName.VISUAL_EFFECTS]: [
+      'The Creator',
+      'Godzilla Minus One',
+      'Guardians of the Galaxy Vol. 3',
+      'Mission: Impossible - Dead Reckoning Part One',
+      'Napoleon'
+    ],
+    [CategoryName.SOUND]: [
+      'The Creator',
+      'Maestro',
+      'Mission: Impossible - Dead Reckoning Part One',
+      'Oppenheimer',
+      'The Zone of Interest'
+    ],
+    [CategoryName.PRODUCTION_DESIGN]: [
+      'Barbie',
+      'Killers of the Flower Moon',
+      'Napoleon',
+      'Oppenheimer',
+      'Poor Things'
+    ],
+    [CategoryName.EDITING]: [
+      'Anatomy of a Fall',
+      'The Holdovers',
+      'Killers of the Flower Moon',
+      'Oppenheimer',
+      'Poor Things'
+    ],
+    [CategoryName.CINEMATOGRAPHY]: [
+      'El Conde',
+      'Killers of the Flower Moon',
+      'Maestro',
+      'Oppenheimer',
+      'Poor Things'
+    ]
   }
 };

@@ -31,7 +31,7 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 export const handler = dbWrapper(client, async ({ db }) => {
   const thirtyDaysAgo = getDate(-30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
-  const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
+  const tomorrowYyyymmdd = dateToYyyymmdd(getDate(1));
 
   // get list of events that are not archived, we'll query only those prediction sets
   console.log('getting events...');
@@ -50,13 +50,13 @@ export const handler = dbWrapper(client, async ({ db }) => {
   console.log('getting contenders...');
   const allContenders = await db
     .collection<Contender>('contenders')
-    .find({}, { projection: { _id: 1, isHidden: 1 } })
+    .find({}, { projection: { _id: 1, category: 1, isHidden: 1 } })
     .toArray();
   const indexedContenderIds: {
-    [cId: string]: { isHidden?: boolean };
+    [cId: string]: { category: CategoryName; isHidden?: boolean };
   } = {};
-  allContenders.forEach(({ _id, isHidden }) => {
-    indexedContenderIds[_id.toString()] = { isHidden };
+  allContenders.forEach(({ _id, category, isHidden }) => {
+    indexedContenderIds[_id.toString()] = { category, isHidden };
   });
 
   // for each active event, take each user's most recent predictionset
@@ -151,6 +151,13 @@ export const handler = dbWrapper(client, async ({ db }) => {
           if (contenderIsHidden) {
             continue;
           }
+          // if it's predicted in the wrong category (edge case / bug) continue
+          const contenderIsInWrongCategory =
+            indexedContenderIds[contenderId].category !== categoryName;
+          if (contenderIsInWrongCategory) {
+            continue;
+          }
+
           // filter for shortlist, if that's happened, and if nominations have NOT happened
           const shouldFilterByIsShortlisted =
             someContendersAreShortlisted &&
@@ -161,12 +168,15 @@ export const handler = dbWrapper(client, async ({ db }) => {
           if (shouldFilterByIsShortlisted && !contenderHasBeenShortlisted) {
             continue;
           }
+
           // filter for nominations, if that's happened
+          // maybe it's not displaying because it's not getting the most recent, it's getting today's date of community?
           const contenderHasBeenNominated =
             contenderIdToAccolade[contenderId] === Phase.NOMINATION;
-          if (someContendersAreNominated && contenderHasBeenNominated) {
+          if (someContendersAreNominated && !contenderHasBeenNominated) {
             continue;
           }
+
           // tally all predictions that aren't blocked by the above filters
           if (!numPredicting[categoryName]) {
             numPredicting[categoryName] = {};

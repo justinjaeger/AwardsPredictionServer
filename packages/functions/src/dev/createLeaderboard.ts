@@ -20,9 +20,10 @@ import {
 import { SERVER_ERROR } from 'src/types/responses';
 import { dateToYyyymmdd } from 'src/helper/utils';
 
+// CHANGE THESE ONLY:
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 const TARGET_EVENT_YEAR: number = 2024;
-const PHASE: Phase = Phase.SHORTLIST;
+const PHASE: Phase = Phase.NOMINATION;
 const INCLUDE_SHORT_FILMS: boolean = true;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
