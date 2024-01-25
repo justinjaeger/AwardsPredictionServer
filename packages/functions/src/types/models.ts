@@ -272,6 +272,7 @@ export type iLeaderboardRanking = {
   numCorrect: number;
   totalPossibleSlots: number;
   numUsersPredicting: number;
+  slotsPredicted: number;
   yyyymmdd: number; // date of close
 };
 

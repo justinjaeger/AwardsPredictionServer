@@ -151,6 +151,7 @@ export const handler = async () => {
       percentageAccuracy: number;
       riskiness: number;
       numCorrect: number;
+      slotsLeftOpen: number;
     };
   } = {};
 
@@ -204,7 +205,8 @@ export const handler = async () => {
     leaderboardRankings[userId] = {
       percentageAccuracy,
       riskiness,
-      numCorrect: accuratePredictionsTally
+      numCorrect: accuratePredictionsTally,
+      slotsLeftOpen
     };
   }
 
@@ -319,7 +321,10 @@ export const handler = async () => {
     Promise<UpdateResult<LeaderboardRanking>>
   > = [];
   sortedLeaderboardRankings.forEach(
-    ([userId, { percentageAccuracy, numCorrect, riskiness }], i) => {
+    (
+      [userId, { percentageAccuracy, numCorrect, riskiness, slotsLeftOpen }],
+      i
+    ) => {
       const leaderboardRankings: iLeaderboardRanking = {
         eventId,
         phase: PHASE,
@@ -330,6 +335,7 @@ export const handler = async () => {
         riskiness,
         numCorrect,
         totalPossibleSlots: potentialCorrectPredictions,
+        slotsPredicted: potentialCorrectPredictions - slotsLeftOpen,
         numUsersPredicting
       };
       updateUserRequests.push(
