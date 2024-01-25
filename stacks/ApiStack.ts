@@ -74,6 +74,7 @@ export function ApiStack({ stack }: StackContext) {
       "GET /dev/addToAccolades": `${PATH}/dev/addToAccolades.handler`,
       "GET /dev/fixSongs": `${PATH}/dev/fixSongs.handler`,
       "GET /dev/shortlistAllShorts": `${PATH}/dev/shortlistAllShorts.handler`,
+      "GET /dev/removeUnaccoladed": `${PATH}/dev/removeUnaccoladed.handler`,
     },
   });
 
