@@ -159,12 +159,16 @@ export const post = dbWrapper<
       : todayYyyymmdd;
 
     // get most recent to copy over if it's an update
-    const mostRecentPredictionSet = await db
+    const mostRecentPredictionSetAsArray = await db
       .collection<PredictionSet>('predictionsets')
-      .findOne(
-        { userId: new ObjectId(userId), eventId: new ObjectId(eventId) },
-        { sort: { yyyymmdd: -1 } }
-      );
+      .find({ userId: new ObjectId(userId), eventId: new ObjectId(eventId) })
+      .sort({ yyyymmdd: -1 })
+      .limit(1)
+      .toArray();
+
+    // typecast bc [0] might be undefined
+    const mostRecentPredictionSet: WithId<PredictionSet> | undefined =
+      mostRecentPredictionSetAsArray?.[0];
 
     // prepare to update the user's recentPredictionSets
     const user = await db.collection<User>('users').findOne(
