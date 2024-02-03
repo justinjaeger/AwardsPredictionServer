@@ -30,6 +30,7 @@
     "axios": "^1.4.0",
     "eslint-config-prettier": "^8.10.0",
     "jsonwebtoken": "^9.0.1",
-    "mongodb": "^5.7.0"
+    "mongodb": "^5.7.0",
+    "sharp": "^0.33.2"
   }
 }

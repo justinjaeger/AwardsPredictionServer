@@ -2,10 +2,15 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SERVER_ERROR } from './types/responses';
 import { ApiHandler, useHeader } from 'sst/node/api';
 import Jwt from './helper/jwt';
-import { type User } from './types/models';
+import {
+  ProfileImageSize,
+  ProfileImageSuffix,
+  type User
+} from './types/models';
 import { MongoClient, ObjectId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 import { type APIGatewayProxyEventV2 } from 'aws-lambda';
+import sharp from 'sharp';
 
 const BUCKET = 'awards-app-profile-images-prod';
 const s3Client = new S3Client({
@@ -43,20 +48,37 @@ export const post = ApiHandler(async (e: APIGatewayProxyEventV2) => {
 
     // 3) Generate key from user email
     const random = Math.floor(100000 + Math.random() * 900000); // 6 digit random number
-    const key = user.email.split('@')[0] + random.toString();
+    const key = user.email.split('@')[0] + random.toString() + 'v2';
 
     // 4) Parse body and upload to s3
     // @ts-expect-error - e.body is defined
     const buff = Buffer.from(e.body, 'base64');
-    const command = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: 'public/' + key,
-      Body: buff,
-      ContentType: 'image/jpeg'
-    });
-    await s3Client.send(command);
+    const [buffSm, buffMd, buffLg] = await Promise.all(
+      [
+        ProfileImageSize.SMALL,
+        ProfileImageSize.MEDIUM,
+        ProfileImageSize.LARGE
+      ].map(async (size) => await sharp(buff).resize(size, size).toBuffer())
+    );
 
-    // 5) Update user in db
+    const commands = [
+      { buff: buffSm, suffix: ProfileImageSuffix.SMALL },
+      { buff: buffMd, suffix: ProfileImageSuffix.MEDIUM },
+      { buff: buffLg, suffix: ProfileImageSuffix.LARGE }
+    ].map(
+      ({ buff, suffix }) =>
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: 'public/' + key + suffix,
+          Body: buff,
+          ContentType: 'image/jpeg'
+        })
+    );
+    await Promise.all(
+      commands.map(async (command) => await s3Client.send(command))
+    );
+
+    // 5) Update user in db. image becomes key WITHOUT suffix
     await db.collection<User>('users').updateOne(
       {
         _id: new ObjectId(userId)
