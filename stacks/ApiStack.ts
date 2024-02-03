@@ -62,9 +62,7 @@ export function ApiStack({ stack }: StackContext) {
       "POST /predictionsets": `${PATH}/predictionset.post`,
       "POST /contenders": `${PATH}/contender.post`,
       "POST /image": `${PATH}/storage.post`,
-      "POST /imageSm": `${PATH}/storage.postSm`,
-      "POST /imageMd": `${PATH}/storage.postMd`,
-      "POST /imageLg": `${PATH}/storage.postLg`,
+      "POST /imageV2": `${PATH}/storageV2.post`,
       // PUT
       "PUT /users": `${PATH}/user.put`, // userId derived from token
       // DELETE
