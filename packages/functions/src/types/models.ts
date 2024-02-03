@@ -98,6 +98,12 @@ export enum ProfileImageSize {
   LARGE = 500
 }
 
+export enum ProfileImageSuffix {
+  SMALL = 'sm',
+  MEDIUM = 'md',
+  LARGE = 'lg'
+}
+
 export type CategoryUpdateLog = {
   userId: ObjectId;
   eventId: ObjectId;
@@ -301,9 +307,6 @@ export type User = {
   bio?: string;
   role?: UserRole;
   image?: string;
-  imageSm?: string;
-  imageMd?: string;
-  imageLg?: string;
   followingCount?: number;
   followerCount?: number;
   eventsPredicting?: Record<string, string[]>; // key is event, value is array of categories

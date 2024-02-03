@@ -2,7 +2,11 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SERVER_ERROR } from './types/responses';
 import { ApiHandler, useHeader } from 'sst/node/api';
 import Jwt from './helper/jwt';
-import { ProfileImageSize, type User } from './types/models';
+import {
+  ProfileImageSize,
+  ProfileImageSuffix,
+  type User
+} from './types/models';
 import { MongoClient, ObjectId } from 'mongodb';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 import { type APIGatewayProxyEventV2 } from 'aws-lambda';
@@ -58,9 +62,9 @@ export const post = ApiHandler(async (e: APIGatewayProxyEventV2) => {
     );
 
     const commands = [
-      { buff: buffSm, suffix: 'sm' },
-      { buff: buffMd, suffix: 'md' },
-      { buff: buffLg, suffix: 'lg' }
+      { buff: buffSm, suffix: ProfileImageSuffix.SMALL },
+      { buff: buffMd, suffix: ProfileImageSuffix.MEDIUM },
+      { buff: buffLg, suffix: ProfileImageSuffix.LARGE }
     ].map(
       ({ buff, suffix }) =>
         new PutObjectCommand({
