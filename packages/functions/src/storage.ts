@@ -19,10 +19,7 @@ const s3Client = new S3Client({
 const mongoClient = new MongoClient(mongoClientUrl, mongoClientOptions);
 const db = mongoClient.db('db');
 
-const storeImage = async (
-  e: APIGatewayProxyEventV2,
-  size?: 'sm' | 'md' | 'lg'
-) => {
+export const post = ApiHandler(async (e: APIGatewayProxyEventV2) => {
   try {
     // 1) Get/parse jwt from header
     const authorization = useHeader('authorization');
@@ -46,8 +43,7 @@ const storeImage = async (
 
     // 3) Generate key from user email
     const random = Math.floor(100000 + Math.random() * 900000); // 6 digit random number
-    const key =
-      user.email.split('@')[0] + random.toString() + (size ? '-' + size : '');
+    const key = user.email.split('@')[0] + random.toString();
 
     // 4) Parse body and upload to s3
     // @ts-expect-error - e.body is defined
@@ -60,20 +56,12 @@ const storeImage = async (
     });
     await s3Client.send(command);
 
-    const imageKey: keyof User = !size
-      ? 'image'
-      : size === 'sm'
-      ? 'imageSm'
-      : size === 'md'
-      ? 'imageMd'
-      : 'imageLg';
-
     // 5) Update user in db
     await db.collection<User>('users').updateOne(
       {
         _id: new ObjectId(userId)
       },
-      { $set: { [imageKey]: key } }
+      { $set: { image: key } }
     );
 
     return { statusCode: 200, data: key };
@@ -81,21 +69,4 @@ const storeImage = async (
     console.log('Error getting s3 file:', err);
     return { ...SERVER_ERROR.Error, message: err };
   }
-};
-
-// Must preserve original endpoint for bw compatibility
-export const post = ApiHandler(async (e) => {
-  return await storeImage(e);
-});
-
-export const postSm = ApiHandler(async (e) => {
-  return await storeImage(e, 'sm');
-});
-
-export const postMd = ApiHandler(async (e) => {
-  return await storeImage(e, 'md');
-});
-
-export const postLg = ApiHandler(async (e) => {
-  return await storeImage(e, 'lg');
 });
