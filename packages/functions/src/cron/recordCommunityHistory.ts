@@ -16,7 +16,8 @@ import {
   type User,
   type Contender,
   Phase,
-  CategoryType
+  CategoryType,
+  type Accolade
 } from 'src/types/models';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -30,7 +31,7 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 export const handler = dbWrapper(client, async ({ db }) => {
   const thirtyDaysAgo = getDate(-30);
   const todayYyyymmdd = dateToYyyymmdd(getDate());
-  const tomorrowYyyymmdd = dateToYyyymmdd(getDate(-1));
+  const tomorrowYyyymmdd = dateToYyyymmdd(getDate(1));
 
   // get list of events that are not archived, we'll query only those prediction sets
   console.log('getting events...');
@@ -49,13 +50,13 @@ export const handler = dbWrapper(client, async ({ db }) => {
   console.log('getting contenders...');
   const allContenders = await db
     .collection<Contender>('contenders')
-    .find({}, { projection: { _id: 1, isHidden: 1, accolade: 1 } })
+    .find({}, { projection: { _id: 1, category: 1, isHidden: 1 } })
     .toArray();
   const indexedContenderIds: {
-    [cId: string]: { isHidden?: boolean; accolade?: Phase };
+    [cId: string]: { category: CategoryName; isHidden?: boolean };
   } = {};
-  allContenders.forEach(({ _id, isHidden, accolade }) => {
-    indexedContenderIds[_id.toString()] = { isHidden, accolade };
+  allContenders.forEach(({ _id, category, isHidden }) => {
+    indexedContenderIds[_id.toString()] = { category, isHidden };
   });
 
   // for each active event, take each user's most recent predictionset
@@ -67,6 +68,12 @@ export const handler = dbWrapper(client, async ({ db }) => {
       winDateTime,
       shortlistDateTime
     } = event;
+
+    const accolades = await db.collection<Accolade>('accolades').findOne({
+      eventId: new ObjectId(eventId)
+    });
+    const contenderIdToAccolade = accolades?.accolades ?? {};
+
     // we want to record community predictions after the event has happened,
     // BUT give it an hour extra so that we make sure to get what the users did right before they were locked out
     // so the users will be locked out one hour before the last recording
@@ -85,10 +92,14 @@ export const handler = dbWrapper(client, async ({ db }) => {
 
     const someContendersAreShortlisted =
       shortlistHasHappened &&
-      allContenders.some((c) => c.accolade === Phase.SHORTLIST);
+      allContenders.some(
+        (c) => contenderIdToAccolade[c._id.toString()] === Phase.SHORTLIST
+      );
     const someContendersAreNominated =
       nominationsHaveHappened &&
-      allContenders.some((c) => c.accolade === Phase.NOMINATION);
+      allContenders.some(
+        (c) => contenderIdToAccolade[c._id.toString()] === Phase.NOMINATION
+      );
 
     const predictionSetRequests = allUserIds.map(
       async (userId) =>
@@ -140,22 +151,32 @@ export const handler = dbWrapper(client, async ({ db }) => {
           if (contenderIsHidden) {
             continue;
           }
+          // if it's predicted in the wrong category (edge case / bug) continue
+          const contenderIsInWrongCategory =
+            indexedContenderIds[contenderId].category !== categoryName;
+          if (contenderIsInWrongCategory) {
+            continue;
+          }
+
           // filter for shortlist, if that's happened, and if nominations have NOT happened
           const shouldFilterByIsShortlisted =
             someContendersAreShortlisted &&
             isShortlistedCategory &&
             !someContendersAreNominated;
           const contenderHasBeenShortlisted =
-            indexedContenderIds[contenderId].accolade === Phase.SHORTLIST;
+            contenderIdToAccolade[contenderId] === Phase.SHORTLIST;
           if (shouldFilterByIsShortlisted && !contenderHasBeenShortlisted) {
             continue;
           }
+
           // filter for nominations, if that's happened
+          // maybe it's not displaying because it's not getting the most recent, it's getting today's date of community?
           const contenderHasBeenNominated =
-            indexedContenderIds[contenderId].accolade !== Phase.NOMINATION;
-          if (someContendersAreNominated && contenderHasBeenNominated) {
+            contenderIdToAccolade[contenderId] === Phase.NOMINATION;
+          if (someContendersAreNominated && !contenderHasBeenNominated) {
             continue;
           }
+
           // tally all predictions that aren't blocked by the above filters
           if (!numPredicting[categoryName]) {
             numPredicting[categoryName] = {};

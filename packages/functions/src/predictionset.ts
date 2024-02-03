@@ -34,7 +34,6 @@ const client = new MongoClient(mongoClientUrl, mongoClientOptions);
  * Else, get a predictionset for a specific date
  *
  * If categoryName is provided, only return that category
- * // TODO: untested
  */
 export const get = dbWrapper<
   { yyyymmdd: number; categoryName?: CategoryName },
@@ -43,7 +42,13 @@ export const get = dbWrapper<
   client,
   async ({
     db,
-    params: { userId, eventId, yyyymmdd: yyyymmddString, categoryName }
+    params: {
+      userId,
+      eventId,
+      yyyymmdd: yyyymmddString, // NOTE: for this, looks for this date OR EARLIER
+      categoryName,
+      predictionSetId
+    }
   }) => {
     const yyyymmdd = yyyymmddString ? parseInt(yyyymmddString) : undefined;
     const filter: Filter<PredictionSet> = {
@@ -55,7 +60,7 @@ export const get = dbWrapper<
     // if we want a specific date, we pass yyyymmdd
     // else, we'll just return the most recent
     if (yyyymmdd) {
-      filter.yyyymmdd = yyyymmdd;
+      filter.yyyymmdd = { $lte: yyyymmdd };
     } else {
       options.sort = { yyyymmdd: -1 };
     }
@@ -63,22 +68,14 @@ export const get = dbWrapper<
     if (categoryName) {
       options.projection = { [`categories.${categoryName}`]: 1 };
     }
-    // options.projection = { [`categories.SONG`]: 1 }; // DELETE THIS LINE:
-    // const startTime = performance.now();
+
+    if (predictionSetId) {
+      filter._id = new ObjectId(predictionSetId);
+    }
+
     const predictionSet = await db
       .collection<PredictionSet>('predictionsets')
       .findOne(filter, options);
-    // const endTime = performance.now();
-    // 1074ms vs 2857ms total
-    // 249ms vs 1238ms total
-    // IN POSTMAN: 277ms vs 700ms total
-    // console.log(
-    //   'setItemsInCache.all took ' +
-    //     (endTime - startTime).toString() +
-    //     ' milliseconds.'
-    // );
-    // but then it says "done in 3621ms"
-    // why so long?? It has to reach this server, that's why. Idk why THIS is so slow...
 
     return {
       statusCode: 200,
@@ -94,7 +91,6 @@ export const get = dbWrapper<
  * - it will create a new predictionset for the next day
  * - we're comfortable with this so we don't overwrite the FINAL predictions for some leaderboard event
  * - the first prediction they make on the now-shortlisted category can just come the next day
- * TODO: untested
  */
 export const post = dbWrapper<
   {
@@ -111,8 +107,6 @@ export const post = dbWrapper<
     payload: { eventId, categoryName, predictions },
     authenticatedUserId
   }) => {
-    const startTime = performance.now(); // TODO: remove
-
     if (!authenticatedUserId) {
       return SERVER_ERROR.Unauthorized;
     }
@@ -165,12 +159,16 @@ export const post = dbWrapper<
       : todayYyyymmdd;
 
     // get most recent to copy over if it's an update
-    const mostRecentPredictionSet = await db
+    const mostRecentPredictionSetAsArray = await db
       .collection<PredictionSet>('predictionsets')
-      .findOne(
-        { userId: new ObjectId(userId), eventId: new ObjectId(eventId) },
-        { sort: { yyyymmdd: -1 } }
-      );
+      .find({ userId: new ObjectId(userId), eventId: new ObjectId(eventId) })
+      .sort({ yyyymmdd: -1 })
+      .limit(1)
+      .toArray();
+
+    // typecast bc [0] might be undefined
+    const mostRecentPredictionSet: WithId<PredictionSet> | undefined =
+      mostRecentPredictionSetAsArray?.[0];
 
     // prepare to update the user's recentPredictionSets
     const user = await db.collection<User>('users').findOne(
@@ -326,14 +324,6 @@ export const post = dbWrapper<
     } finally {
       await session.endSession();
     }
-    const endTime = performance.now();
-
-    // TODO: remove
-    console.log(
-      'setItemsInCache.all took ' +
-        (endTime - startTime).toString() +
-        ' milliseconds.'
-    );
 
     return {
       statusCode: 200

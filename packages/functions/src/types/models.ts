@@ -112,8 +112,7 @@ export type Contender = {
   personTmdbId?: number;
   songId?: string;
   isHidden?: boolean;
-  accolade?: Phase;
-  numPredicting?: Record<number, number>; // for community predictions only
+  numUsersPredicting?: Record<number, number>; // for community predictions only
   amplify_id?: string;
 };
 
@@ -121,8 +120,33 @@ export type iCategory = {
   type: CategoryType;
   name: string;
   slots?: number; // 5 by default
+  shortlistSlots?: number;
+  winSlots?: number; // 1 by default, just in case there's a tie
   isShortlisted?: boolean;
   isHidden?: boolean;
+  isHiddenBeforeShortlist?: boolean;
+  isHiddenBeforeNoms?: boolean;
+};
+
+export type iLeaderboard = {
+  phase: Phase;
+  noShorts: boolean;
+  numUsersPredicting: number;
+  topPercentageAccuracy: number;
+  medianPercentageAccuracy: number;
+  communityPercentageAccuracy: number;
+  communityRiskiness: number;
+  communityPerformedBetterThanNumUsers: number;
+  communityNumCorrect: number;
+  percentageAccuracyDistribution: { [percentageAccuracy: number]: number };
+  totalPossibleSlots: number;
+  isHidden?: boolean;
+};
+
+// overall aggregate data on event leaderboards
+// forget the key -- just filter by values. Key is just so we don't duplicate
+export type iIndexedEventLeaderboards = {
+  [phaseNoShortsKey: string]: iLeaderboard;
 };
 
 export type EventModel = {
@@ -130,11 +154,14 @@ export type EventModel = {
   awardsBody: AwardsBody;
   year: number;
   status: EventStatus;
+  accoladeId?: ObjectId;
   liveAt?: Date;
+  shortlistDateTime?: Date;
   nomDateTime?: Date;
   winDateTime?: Date;
-  shortlistDateTime?: Date;
+  leaderboards?: iIndexedEventLeaderboards;
   amplify_id?: string;
+  isHidden?: boolean;
 };
 
 export type IMovieCategoryCredit =
@@ -234,6 +261,32 @@ export type iCategoriesPredicting = {
   };
 };
 
+// For leaderboards: Duplicate data between LeaderboardRanking and User
+
+export type iLeaderboardRanking = {
+  eventId: ObjectId;
+  phase: Phase;
+  noShorts?: boolean;
+  rank: number;
+  riskiness: number;
+  percentageAccuracy: number;
+  numCorrect: number;
+  totalPossibleSlots: number;
+  numUsersPredicting: number;
+  slotsPredicted: number;
+  yyyymmdd: number; // date of close
+};
+
+export type LeaderboardRanking = {
+  userId: ObjectId;
+} & iLeaderboardRanking;
+
+export type iIndexedUserLeaderboardRanking = {
+  [eventId: string]: {
+    [phaseNoShortsKey: string]: iLeaderboardRanking;
+  };
+};
+
 export type User = {
   email: string;
   oauthId?: string;
@@ -250,7 +303,17 @@ export type User = {
   eventsPredicting?: Record<string, string[]>; // key is event, value is array of categories
   categoriesPredicting?: iCategoriesPredicting; // ...and replace with this
   recentPredictionSets?: iRecentPrediction[];
+  leaderboardRankings?: iIndexedUserLeaderboardRanking;
   amplify_id?: string;
+};
+
+// instead of the contender being marked with an accolade, keep a separate table
+// as for leaderboard data, that goes under event.leaderboards
+export type Accolade = {
+  eventId: ObjectId;
+  accolades: {
+    [contenderId: string]: Phase;
+  };
 };
 
 export type ApiData = {

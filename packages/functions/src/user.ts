@@ -40,7 +40,8 @@ export const get = dbWrapper<
       ? {
           eventsPredicting: 0,
           categoriesPredicting: 0,
-          recentPredictionSets: 0
+          recentPredictionSets: 0,
+          leaderboardRankings: 0
         }
       : {};
 
@@ -74,10 +75,7 @@ export const get = dbWrapper<
 );
 
 // TODO: Be careful using this because it can be expensive. Don't debounce, just submit on blur or with a button
-export const search = dbWrapper<
-  { query: string; limit?: number; pageNumber?: number },
-  Array<Partial<User>>
->(
+export const search = dbWrapper<undefined, Array<Partial<User>>>(
   client,
   async ({
     db,
@@ -277,6 +275,7 @@ export const put = dbWrapper<Partial<User>, {}>(
       payload.followingCount ??
       payload.eventsPredicting ??
       payload.categoriesPredicting ??
+      payload.leaderboardRankings ??
       payload.role
     ) {
       return {
@@ -327,6 +326,7 @@ export const remove = dbWrapper<Partial<User>, {}>(
           followerCount: 0,
           followingCount: 0,
           eventsPredicting: {},
+          leaderboardRankings: {},
           categoriesPredicting: {},
           recentPredictionSets: [],
           role: UserRole.USER,
