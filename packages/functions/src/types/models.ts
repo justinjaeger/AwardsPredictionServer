@@ -152,6 +152,7 @@ export type iLeaderboard = {
   communityNumCorrect: number;
   percentageAccuracyDistribution: { [percentageAccuracy: number]: number };
   totalPossibleSlots: number;
+  createdAt: Date;
   isHidden?: boolean;
 };
 

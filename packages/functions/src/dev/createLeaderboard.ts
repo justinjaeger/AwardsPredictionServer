@@ -299,7 +299,8 @@ export const handler = async () => {
     communityPerformedBetterThanNumUsers,
     communityRiskiness,
     communityNumCorrect: communityAccuratePredictionsTally,
-    totalPossibleSlots: potentialCorrectPredictions
+    totalPossibleSlots: potentialCorrectPredictions,
+    createdAt: new Date()
   };
 
   const eventUpdateRequest = db.collection<EventModel>('events').updateOne(
