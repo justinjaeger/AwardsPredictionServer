@@ -19,6 +19,7 @@ import {
 } from 'src/types/models';
 import { SERVER_ERROR } from 'src/types/responses';
 import { dateToYyyymmdd } from 'src/helper/utils';
+import { getLastUpdatedOnPredictionSet } from 'src/helper/getLastUpdatedOnPredictionSet';
 
 // CHANGE THESE ONLY:
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
@@ -152,6 +153,7 @@ export const handler = async () => {
       riskiness: number;
       numCorrect: number;
       slotsLeftOpen: number;
+      lastUpdated: Date;
     };
   } = {};
 
@@ -202,11 +204,13 @@ export const handler = async () => {
     // Now that we have the potential versus total correct predictions,
     // create a leaderboardRanking entry
     const userId = predictionSet.userId.toString();
+    const lastUpdated = getLastUpdatedOnPredictionSet(predictionSet);
     leaderboardRankings[userId] = {
       percentageAccuracy,
       riskiness,
       numCorrect: accuratePredictionsTally,
-      slotsLeftOpen
+      slotsLeftOpen,
+      lastUpdated
     };
   }
 
@@ -323,7 +327,16 @@ export const handler = async () => {
   > = [];
   sortedLeaderboardRankings.forEach(
     (
-      [userId, { percentageAccuracy, numCorrect, riskiness, slotsLeftOpen }],
+      [
+        userId,
+        {
+          percentageAccuracy,
+          numCorrect,
+          riskiness,
+          slotsLeftOpen,
+          lastUpdated
+        }
+      ],
       i
     ) => {
       const leaderboardRankings: iLeaderboardRanking = {
@@ -337,7 +350,8 @@ export const handler = async () => {
         numCorrect,
         totalPossibleSlots: potentialCorrectPredictions,
         slotsPredicted: potentialCorrectPredictions - slotsLeftOpen,
-        numUsersPredicting
+        numUsersPredicting,
+        lastUpdated
       };
       updateUserRequests.push(
         db.collection<User>('users').updateOne(
