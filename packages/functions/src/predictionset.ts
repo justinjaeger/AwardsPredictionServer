@@ -120,7 +120,6 @@ export const post = dbWrapper<
           awardsBody: 1,
           year: 1,
           status: 1,
-          liveAt: 1,
           nomDateTime: 1,
           winDateTime: 1,
           shortlistDateTime: 1,
