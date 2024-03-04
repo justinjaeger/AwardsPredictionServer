@@ -11,7 +11,6 @@ import {
   type EventModel,
   type PredictionSet,
   type iPrediction,
-  EventStatus,
   type CategoryName,
   type User,
   type Contender,
@@ -37,7 +36,12 @@ export const handler = dbWrapper(client, async ({ db }) => {
   console.log('getting events...');
   const activeEvents = await db
     .collection<EventModel>('events')
-    .find({ status: { $ne: EventStatus.ARCHIVED } })
+    .find({
+      $or: [
+        { winDateTime: { $gte: new Date() } },
+        { winDateTime: { $exists: false } }
+      ]
+    })
     .toArray();
 
   console.log('getting users...');

@@ -90,9 +90,19 @@ export const search = dbWrapper<undefined, Array<Partial<User>>>(
       return SERVER_ERROR.BadRequest;
     }
 
-    const searchCursor = db.collection<User>('users').find({
-      $text: { $search: query }
-    });
+    const searchCursor = db.collection<User>('users').find(
+      {
+        $text: { $search: query }
+      },
+      {
+        projection: {
+          eventsPredicting: 0,
+          categoriesPredicting: 0,
+          recentPredictionSets: 0,
+          leaderboardRankings: 0
+        }
+      }
+    );
     paginateCursor(searchCursor, pageNumber, limit);
     const userList = await searchCursor.toArray();
 
