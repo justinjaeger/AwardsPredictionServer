@@ -13,7 +13,6 @@ import {
   type User,
   type CategoryUpdateLog,
   type CategoryName,
-  EventStatus,
   type iCategoryPrediction,
   type EventUpdateLog
 } from './types/models';
@@ -135,12 +134,11 @@ export const post = dbWrapper<
         message: `Category ${categoryName} not found on event`
       };
     }
-    const { awardsBody, year, winDateTime, status } = event;
+    const { awardsBody, year, winDateTime } = event;
 
     const winDateHasPassed = !!(winDateTime && winDateTime < new Date());
-    const eventIsArchived = status === EventStatus.ARCHIVED;
 
-    if (winDateHasPassed || eventIsArchived) {
+    if (winDateHasPassed) {
       return {
         ...SERVER_ERROR.BadRequest,
         message: `Event is closed for predictions.`

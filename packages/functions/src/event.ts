@@ -1,6 +1,6 @@
 import { MongoClient, type Filter } from 'mongodb';
 import { dbWrapper } from './helper/wrapper';
-import { EventStatus, type EventModel, type AwardsBody } from './types/models';
+import { type EventModel, type AwardsBody } from './types/models';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -35,7 +35,10 @@ export const list = dbWrapper<undefined, EventModel[]>(
       filter.awardsBody = awardsBody;
     }
     if (isOpen) {
-      filter.status = { $ne: EventStatus.ARCHIVED };
+      filter.$or = [
+        { winDateTime: { $gte: new Date() } },
+        { winDateTime: { $exists: false } }
+      ];
     }
     const events = await db
       .collection<EventModel>('events')

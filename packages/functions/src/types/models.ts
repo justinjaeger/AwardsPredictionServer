@@ -169,7 +169,7 @@ export type EventModel = {
   categories: Record<CategoryName, iCategory>;
   awardsBody: AwardsBody;
   year: number;
-  status: EventStatus;
+  status?: EventStatus;
   accoladeId?: ObjectId;
   shortlistDateTime?: Date;
   nomDateTime?: Date;
