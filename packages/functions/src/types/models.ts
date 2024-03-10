@@ -179,6 +179,7 @@ export type EventModel = {
   amplify_id?: string;
   isHidden?: boolean;
   recordNoHistory?: boolean;
+  eventType?: 'list' | 'prediction';
 };
 
 export type IMovieCategoryCredit =
