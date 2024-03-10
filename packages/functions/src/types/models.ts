@@ -31,7 +31,8 @@ export enum AwardsBody {
   MAKEUP_GUILD = 'MAKEUP_GUILD',
   CDG = 'CDG',
   ASC = 'ASC',
-  MPSE = 'MPSE'
+  MPSE = 'MPSE',
+  COMMUNITY = 'COMMUNITY'
 }
 
 export enum EventStatus {
@@ -177,6 +178,7 @@ export type EventModel = {
   leaderboards?: iIndexedEventLeaderboards;
   amplify_id?: string;
   isHidden?: boolean;
+  recordNoHistory?: boolean;
 };
 
 export type IMovieCategoryCredit =

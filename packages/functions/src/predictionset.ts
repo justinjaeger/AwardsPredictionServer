@@ -247,7 +247,9 @@ export const post = dbWrapper<
           );
           // else if predictionset exists for event, update it
         } else {
+          // important: does not record a new entry if recordNoHistory is true
           const requiresNewEntry =
+            !event.recordNoHistory &&
             yyyymmdd !== mostRecentPredictionSet.yyyymmdd;
           if (requiresNewEntry) {
             const newPredictionSet: PredictionSet = {
@@ -291,26 +293,30 @@ export const post = dbWrapper<
           { session }
         );
 
-        // update eventUpdateLogs - we'll use this to fill out a calendar of days where we made updates
-        await db.collection<EventUpdateLog>('eventupdatelogs').updateOne(
-          {
-            userId: new ObjectId(userId),
-            eventId: new ObjectId(eventId)
-          },
-          { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
-          { upsert: true, session } // useful the first time a user updates a category
-        );
+        if (!event.recordNoHistory) {
+          // update eventUpdateLogs - we'll use this to fill out a calendar of days where we made updates
+          await db.collection<EventUpdateLog>('eventupdatelogs').updateOne(
+            {
+              userId: new ObjectId(userId),
+              eventId: new ObjectId(eventId)
+            },
+            { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
+            { upsert: true, session } // useful the first time a user updates a category
+          );
 
-        // categoryUpdateLogs - useful if you want the calendar to be filled by category and not the event overall
-        await db.collection<CategoryUpdateLog>('categoryupdatelogs').updateOne(
-          {
-            userId: new ObjectId(userId),
-            eventId: new ObjectId(eventId),
-            category: categoryName
-          },
-          { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
-          { upsert: true, session } // useful the first time a user updates a category
-        );
+          // categoryUpdateLogs - useful if you want the calendar to be filled by category and not the event overall
+          await db
+            .collection<CategoryUpdateLog>('categoryupdatelogs')
+            .updateOne(
+              {
+                userId: new ObjectId(userId),
+                eventId: new ObjectId(eventId),
+                category: categoryName
+              },
+              { $set: { [`yyyymmddUpdates.${yyyymmdd}`]: true } },
+              { upsert: true, session } // useful the first time a user updates a category
+            );
+        }
       });
     } catch (e) {
       console.error('error updating predictionset:', e);

@@ -37,6 +37,7 @@ export const handler = dbWrapper(client, async ({ db }) => {
   const activeEvents = await db
     .collection<EventModel>('events')
     .find({
+      recordNoHistory: { $ne: true },
       $or: [
         { winDateTime: { $gte: new Date() } },
         { winDateTime: { $exists: false } }
