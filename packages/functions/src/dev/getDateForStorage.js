@@ -5,8 +5,8 @@
  * Helpful for getting dates based on EST date/times
  * and logging the correct date in UTC (which should be stored)
  */
-const EST_TIME = '8:00:00'; // if >12, then will be PM
-const EST_DATE = 'Jan 23 2024';
+const EST_TIME = '19:00:00'; // if >12, then will be PM
+const EST_DATE = 'Mar 10 2024';
 const date = new Date(`${EST_DATE} ${EST_TIME}`);
 
 const invdate = new Date(
