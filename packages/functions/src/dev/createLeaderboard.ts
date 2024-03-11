@@ -24,7 +24,7 @@ import { getLastUpdatedOnPredictionSet } from 'src/helper/getLastUpdatedOnPredic
 // CHANGE THESE ONLY:
 const TARGET_EVENT_BODY: AwardsBody = AwardsBody.ACADEMY_AWARDS;
 const TARGET_EVENT_YEAR: number = 2024;
-const PHASE: Phase = Phase.NOMINATION;
+const PHASE: Phase = Phase.WINNER;
 const INCLUDE_SHORT_FILMS: boolean = true;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
@@ -35,6 +35,9 @@ const SHORT_CATEGORIES = [
   CategoryName.SHORT_DOCUMENTARY
 ];
 
+/**
+ * Before running this, make sure to addToAccolades
+ */
 export const handler = async () => {
   const db = client.db('db');
 

@@ -19,7 +19,8 @@ import { type iAccoladeData } from 'src/helper/accoladeData';
  * Because punctuation in my db vs the academy's website is going to be different for some titles
  */
 
-const DATA: iAccoladeData = ACCOLADE_DATA.AMPAS_2024_NOMS;
+// CHANGE THIS ONLY
+const DATA: iAccoladeData = ACCOLADE_DATA.AMPAS_2024_WINS;
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 

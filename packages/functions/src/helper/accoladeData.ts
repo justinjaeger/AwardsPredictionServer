@@ -296,3 +296,36 @@ export const AMPAS_2024_NOMS: iAccoladeData = {
     ]
   }
 };
+
+export const AMPAS_2024_WINS: iAccoladeData = {
+  phase: Phase.WINNER,
+  awardsBody: AwardsBody.ACADEMY_AWARDS,
+  year: 2024,
+  data: {
+    [CategoryName.PICTURE]: ['Oppenheimer'],
+    [CategoryName.ACTOR]: ['Cillian Murphy*Oppenheimer'],
+    [CategoryName.ACTRESS]: ['Emma Stone*Poor Things'],
+    [CategoryName.SUPPORTING_ACTOR]: ['Robert Downey Jr.*Oppenheimer'],
+    [CategoryName.SUPPORTING_ACTRESS]: [`Da'Vine Joy Randolph*The Holdovers`],
+    [CategoryName.DIRECTOR]: ['Oppenheimer'],
+    [CategoryName.INTERNATIONAL]: ['The Zone of Interest'],
+    [CategoryName.ANIMATED]: ['The Boy and the Heron'],
+    [CategoryName.ADAPTED_SCREENPLAY]: ['American Fiction'],
+    [CategoryName.ORIGINAL_SCREENPLAY]: ['Anatomy of a Fall'],
+    [CategoryName.SHORT_ANIMATED]: [
+      'WAR IS OVER! Inspired by the Music of John and Yoko'
+    ],
+    [CategoryName.SHORT_LIVE_ACTION]: ['The Wonderful Story of Henry Sugar'],
+    [CategoryName.SHORT_DOCUMENTARY]: ['The Last Repair Shop'],
+    [CategoryName.SCORE]: ['Oppenheimer'],
+    [CategoryName.SONG]: ['346698-What Was I Made For?'],
+    [CategoryName.COSTUMES]: ['Poor Things'],
+    [CategoryName.MAKEUP]: ['Poor Things'],
+    [CategoryName.DOCUMENTARY]: ['20 Days in Mariupol'],
+    [CategoryName.VISUAL_EFFECTS]: ['Godzilla Minus One'],
+    [CategoryName.SOUND]: ['The Zone of Interest'],
+    [CategoryName.PRODUCTION_DESIGN]: ['Poor Things'],
+    [CategoryName.EDITING]: ['Oppenheimer'],
+    [CategoryName.CINEMATOGRAPHY]: ['Oppenheimer']
+  }
+};
