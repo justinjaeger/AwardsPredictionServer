@@ -152,13 +152,13 @@ export const handler = dbWrapper(client, async ({ db }) => {
         } of predictions) {
           const contenderId = contenderObjectId.toString();
           // if hidden, don't tally it
-          const contenderIsHidden = indexedContenderIds[contenderId].isHidden;
+          const contenderIsHidden = indexedContenderIds[contenderId]?.isHidden;
           if (contenderIsHidden) {
             continue;
           }
           // if it's predicted in the wrong category (edge case / bug) continue
           const contenderIsInWrongCategory =
-            indexedContenderIds[contenderId].category !== categoryName;
+            indexedContenderIds[contenderId]?.category !== categoryName;
           if (contenderIsInWrongCategory) {
             continue;
           }
