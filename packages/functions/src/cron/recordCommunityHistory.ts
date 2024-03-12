@@ -37,7 +37,6 @@ export const handler = dbWrapper(client, async ({ db }) => {
   const activeEvents = await db
     .collection<EventModel>('events')
     .find({
-      recordNoHistory: { $ne: true },
       $or: [
         { winDateTime: { $gte: new Date() } },
         { winDateTime: { $exists: false } }
@@ -299,7 +298,9 @@ export const handler = dbWrapper(client, async ({ db }) => {
 
     console.log('5');
     // get the day we should log this predictionset as
-    const yyyymmdd: number = shouldLogPredictionsAsTomorrow(event)
+    const yyyymmdd: number = event.recordNoHistory
+      ? 1 // this will make it not record new history
+      : shouldLogPredictionsAsTomorrow(event)
       ? tomorrowYyyymmdd
       : todayYyyymmdd;
 
