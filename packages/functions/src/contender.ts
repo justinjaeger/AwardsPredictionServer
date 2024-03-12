@@ -152,11 +152,9 @@ export const post = dbWrapper<
         _id: new ObjectId(contenderId)
       });
     } catch (e) {
-      contender = await db.collection<Contender>('contenders').findOne({
-        eventId: new ObjectId(eventId),
-        movieTmdbId,
-        category: categoryName
-      });
+      contender = await db
+        .collection<Contender>('contenders')
+        .findOne(newContender);
     }
 
     return {
