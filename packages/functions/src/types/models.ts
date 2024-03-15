@@ -32,7 +32,8 @@ export enum AwardsBody {
   CDG = 'CDG',
   ASC = 'ASC',
   MPSE = 'MPSE',
-  COMMUNITY = 'COMMUNITY'
+  COMMUNITY = 'COMMUNITY',
+  ANTICIPATED = 'ANTICIPATED'
 }
 
 export enum EventStatus {
