@@ -12,6 +12,7 @@ import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
 import { getSongKey } from './helper/getSongKey';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
+import _ from 'lodash';
 
 const client = new MongoClient(mongoClientUrl, mongoClientOptions);
 
@@ -146,7 +147,9 @@ export const post = dbWrapper<
     try {
       const res = await db
         .collection<Contender>('contenders')
-        .insertOne(newContender);
+        // IMPORTANT: insertOne modifies newContender in place
+        // so if we don't clone it, the catch block will fail
+        .insertOne(_.cloneDeep(newContender));
       const contenderId = res.insertedId.toString();
       contender = await db.collection<Contender>('contenders').findOne({
         _id: new ObjectId(contenderId)
