@@ -40,7 +40,7 @@ export const CATEGORY_NAME_TO_TYPE: { [key in CategoryName]: CategoryType } = {
   [CategoryName.BRITISH_DEBUT]: CategoryType.FILM,
   [CategoryName.COMEDY_ACTOR]: CategoryType.PERFORMANCE,
   [CategoryName.COMEDY_ACTRESS]: CategoryType.PERFORMANCE,
-  [CategoryName.COMEDY_PICTURE]: CategoryType.PERFORMANCE,
+  [CategoryName.COMEDY_PICTURE]: CategoryType.FILM,
   [CategoryName.DEBUT]: CategoryType.FILM,
   [CategoryName.ENSEMBLE]: CategoryType.FILM,
   [CategoryName.FEMALE_DIRECTOR]: CategoryType.FILM,
