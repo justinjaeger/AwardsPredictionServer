@@ -6,9 +6,9 @@ import {
   CategoryType,
   type Contender,
   type Song,
-  type ApiData
+  type ApiData,
+  type EventModel
 } from './types/models';
-import { CATEGORY_NAME_TO_TYPE } from './helper/constants';
 import { SERVER_ERROR } from './types/responses';
 import { getSongKey } from './helper/getSongKey';
 import { mongoClientOptions, mongoClientUrl } from './helper/connect';
@@ -50,7 +50,15 @@ export const post = dbWrapper<
       return SERVER_ERROR.Unauthorized;
     }
 
-    const categoryType = CATEGORY_NAME_TO_TYPE[categoryName];
+    // get event
+    const event = await db
+      .collection<EventModel>('events')
+      .findOne(
+        { _id: new ObjectId(eventId) },
+        { projection: { categories: 1 } }
+      );
+
+    const categoryType = event?.categories[categoryName]?.type;
     if (categoryType === CategoryType.PERFORMANCE && !personTmdbId) {
       return {
         ...SERVER_ERROR.BadRequest,
